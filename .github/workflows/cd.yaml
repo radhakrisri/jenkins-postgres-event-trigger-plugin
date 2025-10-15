@@ -17,26 +17,30 @@ on:
         # Note: Change this default to true,
         #       if the checkbox should be checked by default.
         default: false
-  # If you don't want any automatic trigger in general, then
-  # the following check_run trigger lines should all be commented.
-  # Note: Consider the use case #2 config for 'validate_only' below
-  #       as an alternative option!
-  check_run:
+  # Trigger automatically when the Jenkins CI workflow completes
+  # workflow_run is used instead of check_run because check_run events
+  # from workflows in the same repository don't trigger other workflows
+  workflow_run:
+    workflows: ["Jenkins"]
     types:
       - completed
+    branches:
+      - main
 
 permissions:
   checks: read
   contents: write
+  actions: read
 
 jobs:
   maven-cd:
-    # Only run on check_run events for the Jenkins check from the main branch
+    # Only run if the Jenkins workflow succeeded
+    # For workflow_run events, the verify-ci-status-action will treat it like
+    # workflow_dispatch and query the API for the Jenkins check status
     if: |
       (github.event_name == 'workflow_dispatch') ||
-      (github.event_name == 'check_run' && 
-       github.event.check_run.name == 'Jenkins' && 
-       github.event.check_run.conclusion == 'success')
+      (github.event_name == 'workflow_run' && 
+       github.event.workflow_run.conclusion == 'success')
     uses: jenkins-infra/github-reusable-workflows/.github/workflows/maven-cd.yml@v1
     with:
       # Comment / uncomment the validate_only config appropriate to your preference:
