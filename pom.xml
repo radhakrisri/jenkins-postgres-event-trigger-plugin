@@ -41,10 +41,13 @@
 
     <properties>
         <changelist>999999-SNAPSHOT</changelist>
-        <jenkins.version>2.414.3</jenkins.version>
-        <java.level>11</java.level>
+        <jenkins.version>2.532</jenkins.version>
+        <java.level>21</java.level>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <maven.compiler.release combine.self="override"></maven.compiler.release>
         <credentials.version>1447.v4cb_b_539b_5321</credentials.version>
-        <plain-credentials.version>143.v1b_df8b_d3b_e48</plain-credentials.version>
+        <plain-credentials.version>199.v9f8e1f741799</plain-credentials.version>
     </properties>
 
     <dependencyManagement>
@@ -71,6 +74,14 @@
             <version>${plain-credentials.version}</version>
         </dependency>
 
+        <!-- Servlet API for compilation (workaround for Jenkins compiler bug) -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <version>6.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- WebSocket client for Supabase Realtime -->
         <dependency>
             <groupId>org.java-websocket</groupId>
@@ -93,6 +104,20 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <release combine.self="override"></release>
+                    <source>21</source>
+                    <target>21</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
     <repositories>
         <repository>
