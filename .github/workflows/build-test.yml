@@ -1,13 +1,13 @@
-name: Jenkins
+name: Build and Test
 
 on:
   push:
-    branches: [ main, setup-cd ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
 jobs:
-  test:
+  build-test:
     runs-on: ubuntu-latest
     
     strategy:
@@ -49,17 +49,17 @@ jobs:
         name: test-results-java-${{ matrix.java }}
         path: target/surefire-reports/
 
-  # This job is required for the CD workflow's verify-ci-status-action
-  # It consolidates all test results into a single "Jenkins" check
-  Jenkins:
+  # This job creates a single consolidated check that the publish workflow looks for
+  # It ensures all build-test jobs pass before marking the overall check as successful
+  validate:
     runs-on: ubuntu-latest
-    needs: test
+    needs: [build-test]
     if: always()
     steps:
-      - name: Check test results
+      - name: Check build and test results
         run: |
-          if [ "${{ needs.test.result }}" != "success" ]; then
-            echo "Tests failed or were cancelled"
+          if [ "${{ needs.build-test.result }}" != "success" ]; then
+            echo "❌ Build and test failed"
             exit 1
           fi
-          echo "All tests passed successfully"
+          echo "✅ Build and test passed"
