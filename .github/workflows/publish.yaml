@@ -31,17 +31,110 @@ permissions:
   actions: read
 
 jobs:
-  publish:
-    # Only run if the Build and Test workflow completed successfully
+  # Verify the Build and Test workflow succeeded and get the commit SHA
+  validate-trigger:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_run'
+    outputs:
+      head-sha: ${{ steps.get-sha.outputs.sha }}
+      ci-passed: ${{ steps.check-ci.outputs.passed }}
+    steps:
+      - name: Get workflow run details
+        id: get-sha
+        run: |
+          echo "sha=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
+          echo "Workflow run SHA: ${{ github.event.workflow_run.head_sha }}"
+          echo "Workflow conclusion: ${{ github.event.workflow_run.conclusion }}"
+      
+      - name: Check CI status
+        id: check-ci
+        run: |
+          if [ "${{ github.event.workflow_run.conclusion }}" = "success" ]; then
+            echo "passed=true" >> $GITHUB_OUTPUT
+            echo "✅ Build and Test workflow passed"
+          else
+            echo "passed=false" >> $GITHUB_OUTPUT
+            echo "❌ Build and Test workflow did not pass"
+            exit 1
+          fi
+
+  # Validate and prepare for release
+  validate:
+    runs-on: ubuntu-latest
+    needs: [validate-trigger]
     if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' && 
-       github.event.workflow_run.conclusion == 'success')
-    uses: jenkins-infra/github-reusable-workflows/.github/workflows/maven-cd.yml@v1
-    with:
-      # Automatic publishing after successful builds on main branch
-      # Set to true to only validate and draft release notes without publishing
-      validate_only: ${{ inputs.validate_only == true }}
-    secrets:
-      MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-      MAVEN_TOKEN: ${{ secrets.MAVEN_TOKEN }}
+      always() &&
+      (github.event_name == 'workflow_dispatch' || 
+       (github.event_name == 'workflow_run' && needs.validate-trigger.outputs.ci-passed == 'true'))
+    outputs:
+      should-release: ${{ steps.check-interesting.outputs.should-release }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && needs.validate-trigger.outputs.head-sha || github.sha }}
+          fetch-depth: 0
+      
+      - name: Release Drafter
+        uses: release-drafter/release-drafter@b1476f6e6eb133afa41ed8589daba6dc69b4d3f5 # v6
+        id: draft
+        with:
+          name: next
+          tag: next
+          version: next
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Check interesting categories
+        uses: jenkins-infra/interesting-category-action@v1.2.1
+        id: interesting-categories
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_DRAFT_BODY: ${{ steps.draft.outputs.body }}
+      
+      - name: Determine if release should happen
+        id: check-interesting
+        run: |
+          SHOULD_RELEASE="false"
+          VALIDATE_ONLY="${{ inputs.validate_only }}"
+          INTERESTING="${{ steps.interesting-categories.outputs.interesting }}"
+          
+          if [ "$VALIDATE_ONLY" != "true" ] && [ "$INTERESTING" = "true" ]; then
+            SHOULD_RELEASE="true"
+          fi
+          
+          echo "should-release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
+          
+          echo "## Release Decision" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "VALIDATE_ONLY: $VALIDATE_ONLY" >> $GITHUB_STEP_SUMMARY
+          echo "INTERESTING_CATEGORY: $INTERESTING" >> $GITHUB_STEP_SUMMARY
+          echo "SHOULD_RELEASE: $SHOULD_RELEASE" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  # Perform the actual release
+  release:
+    runs-on: ubuntu-latest
+    needs: [validate-trigger, validate]
+    if: |
+      always() &&
+      needs.validate.outputs.should-release == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && needs.validate-trigger.outputs.head-sha || github.sha }}
+          fetch-depth: 0
+      
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      
+      - name: Release to Jenkins Update Center
+        uses: jenkins-infra/jenkins-maven-cd-action@v1.4.1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_TOKEN: ${{ secrets.MAVEN_TOKEN }}
