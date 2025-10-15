@@ -18,54 +18,20 @@ on:
         #       if the checkbox should be checked by default.
         default: false
 
-  # Trigger automatically on pushes to main (when PRs are merged)
-  # Note: push trigger is used because check_run events from workflows
-  # in the same repository don't trigger other workflows, and workflow_run
-  # is not yet supported by verify-ci-status-action
-  push:
-    branches:
-      - main
+  # If you don't want any automatic trigger in general, then
+  # the following check_run trigger lines should all be commented.
+  # Note: Consider the use case #2 config for 'validate_only' below
+  #       as an alternative option!
+  check_run:
+    types:
+      - completed
 
 permissions:
   checks: read
   contents: write
-  actions: read
 
 jobs:
-  # Verify Jenkins CI completed successfully before running CD
-  check-ci:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    outputs:
-      ci-passed: ${{ steps.check.outputs.passed }}
-    steps:
-      - name: Check Jenkins CI status
-        id: check
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Query the Jenkins check run status for this commit
-          CHECK_CONCLUSION=$(gh api -X GET \
-            -F check_name="Jenkins" \
-            -F status=completed \
-            "/repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs" \
-            | jq -r '.check_runs[0].conclusion // "pending"')
-          
-          echo "Jenkins check conclusion: $CHECK_CONCLUSION"
-          
-          if [ "$CHECK_CONCLUSION" = "success" ]; then
-            echo "passed=true" >> $GITHUB_OUTPUT
-            echo "✅ Jenkins CI passed"
-          else
-            echo "passed=false" >> $GITHUB_OUTPUT
-            echo "❌ Jenkins CI did not pass (status: $CHECK_CONCLUSION)"
-            exit 1
-          fi
-
   maven-cd:
-    needs: [check-ci]
-    if: always() && (needs.check-ci.result == 'success' || needs.check-ci.result == 'skipped')
-
     uses: jenkins-infra/github-reusable-workflows/.github/workflows/maven-cd.yml@v1
     with:
       # Comment / uncomment the validate_only config appropriate to your preference:
