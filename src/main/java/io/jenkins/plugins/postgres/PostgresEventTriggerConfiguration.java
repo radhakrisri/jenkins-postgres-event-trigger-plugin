@@ -8,7 +8,6 @@ import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 
-import javax.annotation.CheckForNull;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -26,7 +25,6 @@ public class PostgresEventTriggerConfiguration extends GlobalConfiguration {
         return GlobalConfiguration.all().get(PostgresEventTriggerConfiguration.class);
     }
 
-    @CheckForNull
     public List<SupabaseInstance> getSupabaseInstances() {
         return supabaseInstances;
     }
@@ -61,7 +59,6 @@ public class PostgresEventTriggerConfiguration extends GlobalConfiguration {
         return FormValidation.ok();
     }
 
-    @CheckForNull
     public SupabaseInstance getInstanceByName(String name) {
         if (supabaseInstances == null || name == null) {
             return null;
