@@ -1,2 +1,5 @@
 
-Postgres Event Trigger Plugin
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core">
+  Postgres Event Trigger Plugin
+</j:jelly>

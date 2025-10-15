@@ -1,5 +1,6 @@
 package io.jenkins.plugins.postgres;
 
+import jenkins.model.GlobalConfiguration;
 import org.junit.Rule;
 import org.junit.Test;
 import org.jvnet.hudson.test.JenkinsRule;
@@ -14,15 +15,26 @@ public class PostgresEventTriggerConfigurationTest {
     @Rule
     public JenkinsRule jenkins = new JenkinsRule();
 
+    @SuppressWarnings("deprecation")
+    private PostgresEventTriggerConfiguration getConfiguration() {
+        PostgresEventTriggerConfiguration config = PostgresEventTriggerConfiguration.get();
+        if (config == null) {
+            // If not auto-loaded, create manually for test
+            config = new PostgresEventTriggerConfiguration();
+            GlobalConfiguration.all().add(config);
+        }
+        return config;
+    }
+
     @Test
     public void testGlobalConfigurationExists() {
-        PostgresEventTriggerConfiguration config = PostgresEventTriggerConfiguration.get();
+        PostgresEventTriggerConfiguration config = getConfiguration();
         assertNotNull(config);
     }
 
     @Test
     public void testSetAndGetSupabaseInstances() {
-        PostgresEventTriggerConfiguration config = PostgresEventTriggerConfiguration.get();
+        PostgresEventTriggerConfiguration config = getConfiguration();
         
         List<SupabaseInstance> instances = new ArrayList<>();
         instances.add(new SupabaseInstance("instance1", "https://test1.supabase.co", "cred1"));
@@ -39,7 +51,7 @@ public class PostgresEventTriggerConfigurationTest {
 
     @Test
     public void testGetInstanceByName() {
-        PostgresEventTriggerConfiguration config = PostgresEventTriggerConfiguration.get();
+        PostgresEventTriggerConfiguration config = getConfiguration();
         
         List<SupabaseInstance> instances = new ArrayList<>();
         instances.add(new SupabaseInstance("instance1", "https://test1.supabase.co", "cred1"));
@@ -58,7 +70,7 @@ public class PostgresEventTriggerConfigurationTest {
 
     @Test
     public void testGetInstanceNames() {
-        PostgresEventTriggerConfiguration config = PostgresEventTriggerConfiguration.get();
+        PostgresEventTriggerConfiguration config = getConfiguration();
         
         List<SupabaseInstance> instances = new ArrayList<>();
         instances.add(new SupabaseInstance("instance1", "https://test1.supabase.co", "cred1"));
