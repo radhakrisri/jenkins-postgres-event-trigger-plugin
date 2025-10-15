@@ -12,7 +12,6 @@ import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.QueryParameter;
 
-import javax.annotation.CheckForNull;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
