@@ -17,6 +17,7 @@ on:
         # Note: Change this default to true,
         #       if the checkbox should be checked by default.
         default: false
+
   # Trigger automatically on pushes to main (when PRs are merged)
   # Note: push trigger is used because check_run events from workflows
   # in the same repository don't trigger other workflows, and workflow_run
@@ -28,6 +29,7 @@ on:
 permissions:
   checks: read
   contents: write
+  actions: read
 
 jobs:
   # Verify Jenkins CI completed successfully before running CD
@@ -63,6 +65,7 @@ jobs:
   maven-cd:
     needs: [check-ci]
     if: always() && (needs.check-ci.result == 'success' || needs.check-ci.result == 'skipped')
+
     uses: jenkins-infra/github-reusable-workflows/.github/workflows/maven-cd.yml@v1
     with:
       # Comment / uncomment the validate_only config appropriate to your preference:
