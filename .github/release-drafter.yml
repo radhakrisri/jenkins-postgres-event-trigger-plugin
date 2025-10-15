@@ -1,0 +1,90 @@
+---
+# Configuration for Release Drafter
+# See: https://github.com/release-drafter/release-drafter
+
+_extends: .github
+tag-template: postgres-event-trigger-$RESOLVED_VERSION
+name-template: $RESOLVED_VERSION
+version-template: $MAJOR.$MINOR.$PATCH
+
+categories:
+  - title: '🚀 New features and improvements'
+    labels:
+      - 'feature'
+      - 'enhancement'
+      - 'internal-improvement'
+  - title: '📝 Documentation'
+    labels:
+      - 'documentation'
+  - title: '🐛 Bug fixes'
+    labels:
+      - 'bug'
+      - 'fix'
+      - 'bugfix'
+  - title: '🚦 Tests'
+    labels:
+      - 'test'
+      - 'tests'
+  - title: '🔧 Maintenance'
+    labels:
+      - 'chore'
+      - 'dependencies'
+      - 'internal'
+  - title: '⚠️ Breaking changes'
+    labels:
+      - 'breaking'
+
+change-template: '- $TITLE (#$NUMBER) @$AUTHOR'
+change-title-escapes: '\<*_&'
+
+version-resolver:
+  major:
+    labels:
+      - 'major'
+      - 'breaking'
+  minor:
+    labels:
+      - 'minor'
+      - 'enhancement'
+      - 'feature'
+  patch:
+    labels:
+      - 'patch'
+      - 'fix'
+      - 'bugfix'
+      - 'dependencies'
+      - 'chore'
+  default: patch
+
+exclude-labels:
+  - 'skip-changelog'
+  - 'skip-release-notes'
+
+autolabeler:
+  - label: 'documentation'
+    files:
+      - '*.md'
+      - 'docs/**/*'
+  - label: 'dependencies'
+    files:
+      - 'pom.xml'
+    branch:
+      - '/^dependabot\/.*/'
+  - label: 'chore'
+    branch:
+      - '/^chore\/.*/'
+  - label: 'feature'
+    branch:
+      - '/^feature\/.*/'
+      - '/^feat\/.*/'
+  - label: 'fix'
+    branch:
+      - '/^fix\/.*/'
+      - '/^bugfix\/.*/'
+
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...postgres-event-trigger-$RESOLVED_VERSION
