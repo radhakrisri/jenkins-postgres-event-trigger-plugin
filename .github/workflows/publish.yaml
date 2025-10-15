@@ -1,0 +1,47 @@
+# Note: additional setup is required, see https://www.jenkins.io/redirect/continuous-delivery-of-plugins
+#
+# This workflow publishes the plugin to Jenkins Update Center after successful builds on main branch
+#
+---
+name: Publish Plugin
+
+on:
+  workflow_dispatch:
+    inputs:
+      validate_only:
+        required: false
+        type: boolean
+        description: |
+          Run validation with release drafter only
+          → Skip the release job
+        default: false
+
+  # Trigger automatically after the Build and Test workflow (build-test.yml) completes successfully
+  # This ensures the plugin is only published after PRs are merged and all tests pass
+  workflow_run:
+    workflows: ["Build and Test"]
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  checks: read
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    # Only run if the Build and Test workflow completed successfully
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && 
+       github.event.workflow_run.conclusion == 'success')
+    uses: jenkins-infra/github-reusable-workflows/.github/workflows/maven-cd.yml@v1
+    with:
+      # Automatic publishing after successful builds on main branch
+      # Set to true to only validate and draft release notes without publishing
+      validate_only: ${{ inputs.validate_only == true }}
+    secrets:
+      MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+      MAVEN_TOKEN: ${{ secrets.MAVEN_TOKEN }}
