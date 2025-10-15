@@ -44,7 +44,7 @@
         <jenkins.version>2.414.3</jenkins.version>
         <java.level>11</java.level>
         <credentials.version>1189.vf61b_a_5e2f62e</credentials.version>
-        <plain-credentials.version>143.v1b_df8b_d3b_e48</plain-credentials.version>
+        <plain-credentials.version>199.v9f8e1f741799</plain-credentials.version>
     </properties>
 
     <dependencies>
