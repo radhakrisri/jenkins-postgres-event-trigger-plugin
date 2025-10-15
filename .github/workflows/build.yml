@@ -1,22 +1,24 @@
-name: Build and Test
+name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, setup-cd ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     
     strategy:
       matrix:
-        java: [ '11', '17' ]
+        java: [ '11', '17', '21' ]
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Required for incrementals to work properly
       
     - name: Set up JDK ${{ matrix.java }}
       uses: actions/setup-java@v4
@@ -33,14 +35,13 @@ jobs:
       
     - name: Package plugin
       run: mvn package -DskipTests
+      env:
+        # Add JVM args to handle Java 21 compatibility issues
+        MAVEN_OPTS: >-
+          --add-opens=java.base/java.lang=ALL-UNNAMED
+          --add-opens=java.base/java.io=ALL-UNNAMED
+          --add-opens=java.base/java.util=ALL-UNNAMED
       
-    - name: Upload artifact
-      if: matrix.java == '11'
-      uses: actions/upload-artifact@v4
-      with:
-        name: postgres-event-trigger-plugin
-        path: target/*.hpi
-        
     - name: Upload test results
       if: always()
       uses: actions/upload-artifact@v4

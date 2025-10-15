@@ -12,7 +12,7 @@ A Jenkins plugin that enables jobs to be triggered by database events from Postg
 
 ## Requirements
 
-- Jenkins 2.361.4 or later
+- Jenkins 2.414.3 or later
 - Java 11 or later
 - A Supabase project with Realtime enabled
 
@@ -177,6 +177,14 @@ This plugin is licensed under the MIT License. See the [LICENSE](LICENSE) file f
 ## Support
 
 For issues, questions, or contributions, please visit the [GitHub repository](https://github.com/radhakrisri/jenkins-postgres-event-trigger-plugin).
+
+## Versioning and Releases
+
+This plugin uses Jenkins incrementals for continuous delivery. Versions follow the format `xxx.vyyyyyyy` where:
+- `xxx` is the Jenkins baseline version requirement
+- `vyyyyyyy` is the Git commit hash
+
+Releases are automatically published to the Jenkins update center when changes are merged to the main branch.
 
 ## Acknowledgments
 

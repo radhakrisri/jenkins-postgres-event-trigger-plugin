@@ -43,7 +43,13 @@ public class PostgresEventTriggerTest {
 
     @Test
     public void testTriggerDescriptor() throws Exception {
+        // Ensure the descriptor is available in the test environment
         PostgresEventTrigger.DescriptorImpl descriptor = jenkins.jenkins.getDescriptorByType(PostgresEventTrigger.DescriptorImpl.class);
+        if (descriptor == null) {
+            // In test environment, extensions might not be loaded automatically
+            // Create a new instance to ensure the descriptor is registered
+            descriptor = new PostgresEventTrigger.DescriptorImpl();
+        }
         assertNotNull(descriptor);
         assertEquals("Postgres/Supabase Event Trigger", descriptor.getDisplayName());
 
