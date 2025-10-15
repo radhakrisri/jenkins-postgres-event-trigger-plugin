@@ -176,7 +176,7 @@ This plugin is licensed under the MIT License. See the [LICENSE](LICENSE) file f
 
 ## Support
 
-For issues, questions, or contributions, please visit the [GitHub repository](https://github.com/radhakrisri/jenkins-postgres-event-trigger-plugin). Please raise issues in the repository if you need to report any issues.
+For issues, questions, or contributions, please visit the [GitHub repository](https://github.com/radhakrisri/jenkins-postgres-event-trigger-plugin). Please use the repository's issue tracker to report any problems.
 
 ## Versioning and Releases
 
