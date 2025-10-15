@@ -1,6 +1,6 @@
 # Postgres Event Trigger Plugin for Jenkins
 
-A Jenkins plugin that enables jobs to be triggered by database events from Postgres/Supabase tables using Supabase's Realtime feature.
+A Jenkins plugin that enables jobs to be triggered by real-time database events from Postgres/Supabase tables using Supabase's Realtime feature.
 
 ## Features
 
