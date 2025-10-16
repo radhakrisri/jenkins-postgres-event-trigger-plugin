@@ -1,29 +1,45 @@
-# Postgres Event Trigger Plugin for Jenkins
+# Jenkins Supabase Plugin
 
-A Jenkins plugin that enables jobs to be triggered by real-time database events from Postgres/Supabase tables using Supabase's Realtime feature.
+A comprehensive Jenkins plugin for Supabase integration that enables real-time event triggers, post-build actions, and database operations.
 
 ## Features
 
+### Current Features
 - **Real-time Event Monitoring**: Subscribe to INSERT, UPDATE, and DELETE events on Postgres tables
 - **Multiple Supabase Instances**: Configure and manage multiple Supabase instances from Jenkins global configuration
 - **Flexible Table Selection**: Monitor one or more tables per job, with support for schema specification
 - **Event Data Access**: Event data is passed to builds as environment variables
 - **Secure Credential Management**: Uses Jenkins credentials for API key storage
 
+### Planned Features
+- **Post-Build Actions**: Execute database operations after build completion
+- **Database Query Actions**: Run custom SQL queries as build steps
+- **Row-Level Security Integration**: Manage RLS policies through Jenkins
+- **Storage Operations**: Upload/download files to/from Supabase Storage
+- **Edge Functions Integration**: Deploy and manage Supabase Edge Functions
+
 ## Requirements
 
-- Jenkins 2.414.3 or later
-- Java 11 or later
+- Jenkins 2.516.3 or later
+- Java 21 or later
 - A Supabase project with Realtime enabled
 
 ## Installation
 
-1. Build the plugin:
-   ```bash
-   mvn clean package
-   ```
+### From Release
 
-2. Install the generated `target/postgres-event-trigger.hpi` file through Jenkins Plugin Manager
+1. Download the latest `jenkins-supabase.hpi` file from the [releases page](https://github.com/radhakrisri/jenkins-supabase/releases)
+2. Install through Jenkins Plugin Manager: **Manage Jenkins** → **Manage Plugins** → **Advanced** → **Upload Plugin**
+
+### Building from Source
+
+```bash
+git clone https://github.com/radhakrisri/jenkins-supabase.git
+cd jenkins-supabase
+mvn clean package
+```
+
+This will generate `target/jenkins-supabase.hpi` which can be installed in Jenkins.
 
 ## Configuration
 
@@ -49,11 +65,13 @@ A Jenkins plugin that enables jobs to be triggered by real-time database events 
 ### Job Configuration
 
 1. Create or configure a Jenkins job (Freestyle or Pipeline)
-2. In the job configuration, under **Build Triggers**, check **Postgres/Supabase Event Trigger**
+2. In the job configuration, under **Build Triggers**, check **Supabase Event Trigger**
 3. Configure the trigger:
    - **Supabase Instance**: Select the instance to monitor
    - **Tables**: Enter comma-separated table names (e.g., `users, orders` or `public.users, myschema.orders`)
    - **Subscribe to Events**: Check the events you want to monitor (INSERT, UPDATE, DELETE)
+
+> **Note**: Additional post-build actions and database operations will be available in future releases.
 
 ## Usage
 
@@ -147,9 +165,25 @@ pipeline {
 ### Building from Source
 
 ```bash
-git clone https://github.com/radhakrisri/jenkins-postgres-event-trigger-plugin.git
-cd jenkins-postgres-event-trigger-plugin
+git clone https://github.com/radhakrisri/jenkins-supabase.git
+cd jenkins-supabase
 mvn clean package
+```
+
+### Quick Build Commands
+
+```bash
+# Build snapshot version
+./release.sh build
+
+# Run tests
+./release.sh test
+
+# Check current version
+./release.sh version
+
+# Create a release (requires clean git state)
+./release.sh release 1.1.0
 ```
 
 ### Running Tests
@@ -176,15 +210,24 @@ This plugin is licensed under the MIT License. See the [LICENSE](LICENSE) file f
 
 ## Support
 
-For issues, questions, or contributions, please visit the [GitHub repository](https://github.com/radhakrisri/jenkins-postgres-event-trigger-plugin). Please use the repository's issue tracker to report any problems.
+For issues, questions, or contributions, please visit the [GitHub repository](https://github.com/radhakrisri/jenkins-supabase). Please use the repository's issue tracker to report any problems.
 
 ## Versioning and Releases
 
-This plugin uses Jenkins incrementals for continuous delivery. Versions follow the format `xxx.vyyyyyyy` where:
-- `xxx` is the Jenkins baseline version requirement
-- `vyyyyyyy` is the Git commit hash
+This plugin follows semantic versioning (SemVer) and uses git-changelist-maven-extension for automatic version management:
 
-Releases are automatically published to the Jenkins update center when changes are merged to the main branch.
+- **Development versions**: `X.Y.Z-SNAPSHOT` (e.g., `1.1.0-SNAPSHOT`)
+- **Release versions**: `X.Y.Z` (e.g., `1.1.0`)
+- **HPI file name**: Always `jenkins-supabase.hpi` (version embedded in manifest)
+
+### Release Process
+
+1. Development with SNAPSHOT versions
+2. Create git tag with format `vX.Y.Z` for releases
+3. Automatic version resolution via git-changelist extension
+4. Use `./release.sh release X.Y.Z` for automated releases
+
+See [VERSIONING.md](VERSIONING.md) for detailed versioning strategy.
 
 ## Acknowledgments
 

@@ -10,13 +10,13 @@
     </parent>
 
     <groupId>io.jenkins.plugins</groupId>
-    <artifactId>postgres-event-trigger</artifactId>
+    <artifactId>jenkins-supabase</artifactId>
     <version>${changelist}</version>
     <packaging>hpi</packaging>
 
-    <name>Postgres Event Trigger Plugin</name>
-    <description>Jenkins plugin to trigger builds based on Postgres/Supabase database events</description>
-    <url>https://github.com/radhakrisri/jenkins-postgres-event-trigger-plugin</url>
+    <name>Jenkins Supabase Plugin</name>
+    <description>Jenkins plugin for comprehensive Supabase integration including event triggers, post-build actions, and database operations</description>
+    <url>https://github.com/radhakrisri/jenkins-supabase</url>
 
     <licenses>
         <license>
@@ -33,14 +33,15 @@
     </developers>
 
     <scm>
-        <connection>scm:git:https://github.com/radhakrisri/jenkins-postgres-event-trigger-plugin.git</connection>
-        <developerConnection>scm:git:https://github.com/radhakrisri/jenkins-postgres-event-trigger-plugin.git</developerConnection>
-        <url>https://github.com/radhakrisri/jenkins-postgres-event-trigger-plugin</url>
+        <connection>scm:git:https://github.com/radhakrisri/jenkins-supabase.git</connection>
+        <developerConnection>scm:git:https://github.com/radhakrisri/jenkins-supabase.git</developerConnection>
+        <url>https://github.com/radhakrisri/jenkins-supabase</url>
         <tag>HEAD</tag>
     </scm>
 
     <properties>
-        <changelist>999999-SNAPSHOT</changelist>
+        <changelist>1.1.0-SNAPSHOT</changelist>
+        <changelist.format>%d.v%s</changelist.format>
         <!-- 
             Using Jenkins 2.516.3 LTS for:
             1. Stability (LTS branch, not weekly releases)
@@ -142,6 +143,16 @@
                     <excludes>
                         <exclude>InjectedTest.java</exclude>
                     </excludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-release-plugin</artifactId>
+                <version>3.0.1</version>
+                <configuration>
+                    <tagNameFormat>v@{project.version}</tagNameFormat>
+                    <releaseProfiles>release</releaseProfiles>
+                    <goals>deploy</goals>
                 </configuration>
             </plugin>
         </plugins>
