@@ -1,0 +1,28 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+    <f:section title="Supabase Build Recorder Configuration">
+        <f:entry title="Supabase Instance" field="instanceName" description="Select the Supabase instance to record build data to">
+            <f:select />
+        </f:entry>
+        
+        <f:optionalBlock title="Record Artifacts" field="recordArtifacts" checked="${instance.recordArtifacts}" 
+                        description="Include information about build artifacts in the recorded data">
+        </f:optionalBlock>
+        
+        <f:optionalBlock title="Record Stages" field="recordStages" checked="${instance.recordStages}"
+                        description="Include pipeline stage information (for pipeline builds)">
+        </f:optionalBlock>
+        
+        <f:optionalBlock title="Record Test Results" field="recordTestResults" checked="${instance.recordTestResults}"
+                        description="Include test result information if available">
+        </f:optionalBlock>
+        
+        <f:optionalBlock title="Record Environment Variables" field="recordEnvironmentVariables" checked="${instance.recordEnvironmentVariables}"
+                        description="Include environment variables (sensitive variables are filtered out)">
+        </f:optionalBlock>
+        
+        <f:entry title="Custom Fields" field="customFields" description="Additional custom data to record as JSON">
+            <f:textarea rows="3" placeholder='{"custom_field": "value", "another_field": 123}' />
+        </f:entry>
+    </f:section>
+</j:jelly>

@@ -10,9 +10,9 @@ A comprehensive Jenkins plugin for Supabase integration that enables real-time e
 - **Flexible Table Selection**: Monitor one or more tables per job, with support for schema specification
 - **Event Data Access**: Event data is passed to builds as environment variables
 - **Secure Credential Management**: Uses Jenkins credentials for API key storage
+- **Build Data Recording**: Comprehensive post-build action to record detailed build information to Supabase
 
 ### Planned Features
-- **Post-Build Actions**: Execute database operations after build completion
 - **Database Query Actions**: Run custom SQL queries as build steps
 - **Row-Level Security Integration**: Manage RLS policies through Jenkins
 - **Storage Operations**: Upload/download files to/from Supabase Storage
@@ -64,6 +64,8 @@ This will generate `target/jenkins-supabase.hpi` which can be installed in Jenki
 
 ### Job Configuration
 
+#### Event Triggers
+
 1. Create or configure a Jenkins job (Freestyle or Pipeline)
 2. In the job configuration, under **Build Triggers**, check **Supabase Event Trigger**
 3. Configure the trigger:
@@ -71,17 +73,121 @@ This will generate `target/jenkins-supabase.hpi` which can be installed in Jenki
    - **Tables**: Enter comma-separated table names (e.g., `users, orders` or `public.users, myschema.orders`)
    - **Subscribe to Events**: Check the events you want to monitor (INSERT, UPDATE, DELETE)
 
-> **Note**: Additional post-build actions and database operations will be available in future releases.
+#### Build Data Recording (Post-Build Action)
+
+1. In the job configuration, under **Post-build Actions**, add **Record Build Data to Supabase**
+2. Configure the recorder:
+   - **Supabase Instance**: Select the instance to record data to
+   - **Record Artifacts**: Include build artifact information
+   - **Record Stages**: Include pipeline stage information (for pipeline builds)
+   - **Record Test Results**: Include test result summaries
+   - **Record Environment Variables**: Include environment variables (sensitive ones filtered)
+   - **Custom Fields**: Add custom JSON data to each build record
+
+The build recorder automatically:
+- Creates a table named `builds_{job_path}` for storing build data
+- Maintains job metadata in a central `jobs` table
+- Records comprehensive build information including timing, results, artifacts, and more
 
 ## Usage
 
-### Accessing Event Data in Builds
+### Event Triggers
+
+#### Accessing Event Data in Builds
 
 When a build is triggered by a database event, the following environment variables are available:
 
 - `POSTGRES_EVENT_TYPE`: The type of event (INSERT, UPDATE, or DELETE)
 - `POSTGRES_TABLE_NAME`: The name of the table that triggered the event
 - `POSTGRES_EVENT_DATA`: JSON string containing the full event payload from Supabase
+
+### Build Data Recording
+
+#### Recorded Data
+
+The build recorder captures comprehensive information about each build:
+
+**Basic Build Information:**
+- Build number, ID, URL, result, and duration
+- Start/end times and queue time
+- Node and executor information
+- Workspace path
+
+**Build Context:**
+- Build causes and triggers
+- SCM information (if available)
+- Environment variables (optional, sensitive ones filtered)
+
+**Build Artifacts:**
+- Artifact filenames, paths, and download URLs
+- Artifact metadata
+
+**Test Results:**
+- Test counts (total, passed, failed, skipped)
+- Links to detailed test reports
+- Test result summaries
+
+**Pipeline Stages:**
+- Stage information for pipeline builds
+- Stage execution data (when available)
+
+**Custom Data:**
+- User-defined JSON fields
+- Additional metadata specific to your use case
+
+#### Database Schema
+
+The plugin automatically creates two types of tables:
+
+1. **Jobs Metadata Table** (`jobs`):
+   - Tracks all jobs using the plugin
+   - Stores job configuration and metadata
+   - Maps jobs to their corresponding build tables
+
+2. **Job-Specific Build Tables** (`builds_{job_path}`):
+   - One table per job based on the job path
+   - Stores all build records for that job
+   - Indexed for efficient querying by build number, result, and time
+
+#### Example Queries
+
+```sql
+-- Get all jobs using the plugin
+SELECT job_name, job_display_name, table_name, created_at 
+FROM jobs 
+WHERE is_active = true;
+
+-- Get recent build results for a specific job
+SELECT build_number, result, duration_ms, start_time, end_time 
+FROM builds_my_project 
+ORDER BY build_number DESC 
+LIMIT 10;
+
+-- Get build success rate over time
+SELECT 
+    DATE(start_time) as build_date,
+    COUNT(*) as total_builds,
+    COUNT(*) FILTER (WHERE result = 'SUCCESS') as successful_builds,
+    ROUND(COUNT(*) FILTER (WHERE result = 'SUCCESS') * 100.0 / COUNT(*), 2) as success_rate
+FROM builds_my_project 
+WHERE start_time >= NOW() - INTERVAL '30 days'
+GROUP BY DATE(start_time)
+ORDER BY build_date DESC;
+
+-- Get average build duration by result
+SELECT 
+    result, 
+    COUNT(*) as build_count,
+    ROUND(AVG(duration_ms / 1000.0), 2) as avg_duration_seconds
+FROM builds_my_project 
+GROUP BY result;
+
+-- Find builds with specific artifacts
+SELECT build_number, build_url, artifacts
+FROM builds_my_project 
+WHERE artifacts ? 'artifact_0' 
+  AND artifacts->'artifact_0'->>'filename' LIKE '%.jar';
+```
 
 ### Example: Freestyle Job
 
