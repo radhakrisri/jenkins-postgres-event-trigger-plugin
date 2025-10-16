@@ -1,5 +1,5 @@
 
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j="jelly:core">
-  Postgres Event Trigger Plugin
+  Supabase Event Trigger Plugin
 </j:jelly>
