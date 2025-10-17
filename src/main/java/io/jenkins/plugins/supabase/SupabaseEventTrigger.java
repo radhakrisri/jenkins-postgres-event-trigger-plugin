@@ -84,15 +84,11 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
                 return;
             }
             
-            String url = instance.getUrl();
-            if (!url.startsWith("ws://") && !url.startsWith("wss://")) {
-                url = url.replace("https://", "wss://").replace("http://", "ws://");
-                if (!url.contains("/realtime/")) {
-                    url = url + "/realtime/v1/websocket";
-                }
-            }
+            // Construct WebSocket URL from Supabase API URL
+            String apiUrl = instance.getUrl();
+            String wsUrl = buildWebSocketUrl(apiUrl, instance.getApiKey().getPlainText());
             
-            client = new SupabaseRealtimeClient(url, instance.getApiKey());
+            client = new SupabaseRealtimeClient(wsUrl, null);
             client.connect();
             
             // Wait for connection
@@ -209,9 +205,32 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
             return "Triggered by Supabase " + eventType + " event on table " + tableName;
         }
     }
+    
+    /**
+     * Builds a WebSocket URL from a Supabase API URL.
+     * Converts http(s):// to ws(s):// and appends the Realtime WebSocket path with required query parameters.
+     * 
+     * @param apiUrl The Supabase API URL (e.g., http://localhost:54321 or https://your-project.supabase.co)
+     * @param apiKey The Supabase API key for authentication
+     * @return The WebSocket URL with proper protocol, path, and query parameters
+     */
+    private String buildWebSocketUrl(String apiUrl, String apiKey) {
+        // Remove trailing slash if present
+        if (apiUrl.endsWith("/")) {
+            apiUrl = apiUrl.substring(0, apiUrl.length() - 1);
+        }
+        
+        // Convert HTTP(S) to WS(S)
+        String wsUrl = apiUrl.replace("https://", "wss://").replace("http://", "ws://");
+        
+        // Append Realtime WebSocket endpoint with required query parameters
+        wsUrl = wsUrl + "/realtime/v1/websocket?apikey=" + apiKey + "&vsn=1.0.0";
+        
+        return wsUrl;
+    }
 
     @Extension
-    public static class DescriptorImpl extends TriggerDescriptor {
+    public static final class DescriptorImpl extends TriggerDescriptor {
 
         @Override
         public boolean isApplicable(Item item) {

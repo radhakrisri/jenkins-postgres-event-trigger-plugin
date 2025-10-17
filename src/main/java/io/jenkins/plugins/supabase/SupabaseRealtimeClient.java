@@ -29,7 +29,10 @@ public class SupabaseRealtimeClient extends WebSocketClient {
     public SupabaseRealtimeClient(String url, Secret apiKey) throws Exception {
         super(new URI(url));
         this.apiKey = apiKey != null ? apiKey.getPlainText() : null;
-        addHeader("apikey", this.apiKey);
+        // Only add header if apiKey is provided (for backward compatibility)
+        if (this.apiKey != null) {
+            addHeader("apikey", this.apiKey);
+        }
     }
 
     @Override
