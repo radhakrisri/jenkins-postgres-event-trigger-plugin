@@ -75,6 +75,17 @@ This will generate `target/jenkins-supabase.hpi` which can be installed in Jenki
 
 #### Build Data Recording (Post-Build Action)
 
+**Prerequisites:** Before using the Build Recorder, you must create the required database tables:
+
+1. **Create tables using SQL script**:
+   - Use the provided `create_build_recorder_tables.sql` file
+   - Execute it in your Supabase SQL Editor or via migration
+   - This creates the `jobs` metadata table and job-specific build tables
+
+2. **Or manually create tables** using the schemas documented below
+
+**Job Configuration:**
+
 1. In the job configuration, under **Post-build Actions**, add **Record Build Data to Supabase**
 2. Configure the recorder:
    - **Supabase Instance**: Select the instance to record data to
@@ -84,9 +95,10 @@ This will generate `target/jenkins-supabase.hpi` which can be installed in Jenki
    - **Record Environment Variables**: Include environment variables (sensitive ones filtered)
    - **Custom Fields**: Add custom JSON data to each build record
 
-The build recorder automatically:
-- Creates a table named `builds_{job_path}` for storing build data
+The build recorder:
+- Stores build data in tables named `builds_{job_path}`
 - Maintains job metadata in a central `jobs` table
+- Uses Supabase REST API for data insertion
 - Records comprehensive build information including timing, results, artifacts, and more
 
 ## Usage
@@ -136,6 +148,74 @@ The build recorder captures comprehensive information about each build:
 - Additional metadata specific to your use case
 
 #### Database Schema
+
+**Important:** The Build Recorder requires manual table creation. Tables are NOT created automatically to prevent race conditions and ensure proper schema control.
+
+**Table Creation Methods:**
+
+1. **Using the provided SQL script** (recommended):
+   ```bash
+   # Use the create_build_recorder_tables.sql file
+   # Execute in Supabase SQL Editor or via migration
+   ```
+
+2. **Manually create tables** with the following schemas:
+
+**Jobs Metadata Table (`jobs`):**
+```sql
+CREATE TABLE IF NOT EXISTS jobs (
+    id BIGSERIAL PRIMARY KEY,
+    job_name TEXT NOT NULL,
+    job_full_name TEXT UNIQUE NOT NULL,
+    job_display_name TEXT,
+    table_name TEXT NOT NULL,
+    job_type TEXT,
+    job_url TEXT,
+    folder_path TEXT,
+    configuration JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+COMMENT ON TABLE jobs IS 'Metadata about Jenkins jobs using Supabase Build Recorder';
+```
+
+**Job-Specific Build Tables (`builds_{job_path}`):**
+
+For each job, create a table named after the job path (e.g., `builds_my_project`):
+
+```sql
+CREATE TABLE IF NOT EXISTS builds_{job_path} (
+    id BIGSERIAL PRIMARY KEY,
+    build_number INTEGER NOT NULL,
+    build_id TEXT,
+    build_url TEXT,
+    result TEXT,
+    duration_ms BIGINT,
+    start_time TIMESTAMPTZ,
+    end_time TIMESTAMPTZ,
+    queue_time_ms BIGINT,
+    node_name TEXT,
+    executor_info JSONB,
+    workspace_path TEXT,
+    causes JSONB,
+    artifacts JSONB,
+    test_results JSONB,
+    stages JSONB,
+    environment_variables JSONB,
+    custom_data JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(build_number)
+);
+
+COMMENT ON TABLE builds_{job_path} IS 'Build data for job {job_name}';
+```
+
+**Table Naming Convention:**
+- Job path `my-project` → table `builds_my_project`
+- Job path `folder/sub-job` → table `builds_folder_sub_job`
+- Special characters replaced with underscores
+- Prefixed with `builds_` for consistency
 
 The plugin automatically creates two types of tables:
 
