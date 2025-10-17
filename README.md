@@ -420,20 +420,63 @@ For issues, questions, or contributions, please visit the [GitHub repository](ht
 
 ## Versioning and Releases
 
-This plugin follows semantic versioning (SemVer) and uses git-changelist-maven-extension for automatic version management:
+This plugin follows semantic versioning (SemVer) and uses git-changelist-maven-extension for automatic version management.
 
-- **Development versions**: `X.Y.Z-SNAPSHOT` (e.g., `1.1.0-SNAPSHOT`)
-- **Release versions**: `X.Y.Z` (e.g., `1.1.0`)
-- **HPI file name**: Always `jenkins-supabase.hpi` (version embedded in manifest)
+### Version Format
+
+- **Release builds**: `X.Y.Z` (e.g., `1.1.0`)
+- **Snapshot builds**: `X.Y.Z-SNAPSHOT` (e.g., `1.1.0-SNAPSHOT`)
+- **Release candidates**: `X.Y.Z-RC.N` (e.g., `1.1.0-RC.1`)
+
+### HPI File Naming
+
+The generated HPI file follows Jenkins plugin naming conventions:
+- **File name**: `jenkins-supabase.hpi` (version embedded in manifest)
+- **ArtifactId**: `jenkins-supabase`
+- **Display name**: "Jenkins Supabase Plugin"
 
 ### Release Process
 
-1. Development with SNAPSHOT versions
-2. Create git tag with format `vX.Y.Z` for releases
-3. Automatic version resolution via git-changelist extension
-4. Use `./release.sh release X.Y.Z` for automated releases
+1. **Development**: Work with SNAPSHOT versions (e.g., `1.1.0-SNAPSHOT`)
+2. **Release**: Create a git tag with format `vX.Y.Z` (e.g., `v1.1.0`)
+3. **Automatic versioning**: The git-changelist extension automatically:
+   - Uses the tag version for release builds
+   - Generates SNAPSHOT versions between releases
+4. **Use release script**: Run `./release.sh release X.Y.Z` for automated releases
 
-See [VERSIONING.md](VERSIONING.md) for detailed versioning strategy.
+### Version Examples
+
+```bash
+# Check current version on untagged commit after v1.0.0
+mvn help:evaluate -Dexpression=project.version -q -DforceStdout
+# Output: 1.1.0-SNAPSHOT
+
+# Tag and check version
+git tag v1.1.0
+mvn help:evaluate -Dexpression=project.version -q -DforceStdout  
+# Output: 1.1.0
+
+# Build artifacts
+mvn clean package
+# Generates: target/jenkins-supabase.hpi
+
+# Manual version override
+mvn clean package -Dchangelist=1.2.0-RC.1
+# Generates: target/jenkins-supabase-1.2.0-RC.1.hpi
+```
+
+### Semantic Versioning Guidelines
+
+- **Major (X.0.0)**: Breaking changes, incompatible API changes
+- **Minor (x.Y.0)**: New features, backward compatible functionality
+- **Patch (x.y.Z)**: Bug fixes, backward compatible fixes
+
+### Best Practices
+
+1. **Tag releases**: Always tag releases with `vX.Y.Z` format
+2. **SNAPSHOT for development**: Keep SNAPSHOT suffix during development
+3. **Clean git state**: Ensure working tree is clean before releases
+4. **Test before release**: Run full test suite before tagging
 
 ## Acknowledgments
 
