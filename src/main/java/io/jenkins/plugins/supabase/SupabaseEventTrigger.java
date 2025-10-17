@@ -231,18 +231,41 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
         private final String tableName;
         private final String recordNew;
         private final String recordOld;
+        private final long timestamp;
+        private final String eventId;
 
         public SupabaseEventCause(String eventType, String tableName, String recordNew, String recordOld) {
             this.eventType = eventType;
             this.tableName = tableName;
             this.recordNew = recordNew;
             this.recordOld = recordOld;
+            this.timestamp = System.currentTimeMillis();
+            this.eventId = java.util.UUID.randomUUID().toString();
+        }
+        
+        /**
+         * Prevent Jenkins from aggregating multiple events into a single build.
+         * Each event should trigger its own build in the order received.
+         */
+        @Override
+        public boolean equals(Object obj) {
+            // Make each cause unique by comparing eventId
+            if (this == obj) return true;
+            if (!(obj instanceof SupabaseEventCause)) return false;
+            SupabaseEventCause other = (SupabaseEventCause) obj;
+            return eventId.equals(other.eventId);
+        }
+        
+        @Override
+        public int hashCode() {
+            return eventId.hashCode();
         }
 
         @Override
         public String getShortDescription() {
             StringBuilder desc = new StringBuilder();
             desc.append("Triggered by Supabase ").append(eventType).append(" event on table ").append(tableName);
+            desc.append(" at ").append(new java.util.Date(timestamp));
             
             // Add record details based on event type
             if ("INSERT".equals(eventType) && recordNew != null) {
