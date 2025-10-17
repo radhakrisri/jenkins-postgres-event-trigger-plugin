@@ -46,3 +46,6 @@ buildNumber.properties
 # Work directory
 work/
 demo/
+
+# Stapler generated files (Jenkins framework)
+*.stapler
