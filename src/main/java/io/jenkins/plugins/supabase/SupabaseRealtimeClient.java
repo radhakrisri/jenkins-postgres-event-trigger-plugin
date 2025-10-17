@@ -12,7 +12,7 @@ import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -24,10 +24,15 @@ public class SupabaseRealtimeClient extends WebSocketClient {
     private static final Gson GSON = new Gson();
     
     private final String apiKey;
-    private final Map<String, Consumer<JsonObject>> eventHandlers = new HashMap<>();
+    private final Map<String, Consumer<JsonObject>> eventHandlers = new ConcurrentHashMap<>();
     private final AtomicInteger refCounter = new AtomicInteger(0);
-    private final Map<String, String> channelRefs = new HashMap<>();
+    private final Map<String, String> channelRefs = new ConcurrentHashMap<>();
     private String accessToken;
+    
+    // Callbacks for connection lifecycle
+    private Runnable onOpenCallback;
+    private java.util.function.Consumer<String> onCloseCallback; // Consumer<reason>
+    private java.util.function.Consumer<Exception> onErrorCallback;
 
     public SupabaseRealtimeClient(String url, Secret apiKey) throws Exception {
         super(new URI(url));
@@ -41,7 +46,12 @@ public class SupabaseRealtimeClient extends WebSocketClient {
     @Override
     public void onOpen(ServerHandshake handshakedata) {
         LOGGER.info("Connected to Supabase Realtime");
-        sendHeartbeat();
+        if (onOpenCallback != null) {
+            onOpenCallback.run();
+        } else {
+            // Legacy behavior: send heartbeat if no callback set
+            sendHeartbeat();
+        }
     }
 
     @Override
@@ -97,11 +107,17 @@ public class SupabaseRealtimeClient extends WebSocketClient {
     @Override
     public void onClose(int code, String reason, boolean remote) {
         LOGGER.info("Disconnected from Supabase Realtime: " + reason);
+        if (onCloseCallback != null) {
+            onCloseCallback.accept(code + ":" + reason + ":" + remote);
+        }
     }
 
     @Override
     public void onError(Exception ex) {
         LOGGER.log(Level.SEVERE, "WebSocket error", ex);
+        if (onErrorCallback != null) {
+            onErrorCallback.accept(ex);
+        }
     }
 
     public void subscribeToTable(String schema, String table, String event, Consumer<JsonObject> handler) {
@@ -192,8 +208,30 @@ public class SupabaseRealtimeClient extends WebSocketClient {
             LOGGER.info("Unsubscribed from " + topic);
         }
     }
+    
+    /**
+     * Set callback to be invoked when connection opens.
+     */
+    public void setOnOpenCallback(Runnable callback) {
+        this.onOpenCallback = callback;
+    }
+    
+    /**
+     * Set callback to be invoked when connection closes.
+     * Callback receives a string in format "code:reason:remote".
+     */
+    public void setOnCloseCallback(java.util.function.Consumer<String> callback) {
+        this.onCloseCallback = callback;
+    }
+    
+    /**
+     * Set callback to be invoked when connection error occurs.
+     */
+    public void setOnErrorCallback(java.util.function.Consumer<Exception> callback) {
+        this.onErrorCallback = callback;
+    }
 
-    private void sendHeartbeat() {
+    public void sendHeartbeat() {
         if (isOpen()) {
             JsonObject message = new JsonObject();
             message.addProperty("topic", "phoenix");

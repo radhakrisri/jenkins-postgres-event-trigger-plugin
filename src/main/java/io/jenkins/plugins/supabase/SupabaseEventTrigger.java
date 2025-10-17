@@ -26,8 +26,13 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
     private boolean subscribeUpdate = false;
     private boolean subscribeDelete = false;
     
+    // Legacy field for backward compatibility (no longer used)
+    @Deprecated
     private transient SupabaseRealtimeClient client;
     private transient Set<String> subscribedTables = new HashSet<>();
+    
+    // Unique subscriber ID for this trigger instance
+    private transient String subscriberId;
 
     @DataBoundConstructor
     public SupabaseEventTrigger(String instanceName, String tables) {
@@ -80,6 +85,9 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
             subscribedTables = new HashSet<>();
         }
         
+        // Generate unique subscriber ID for this trigger
+        subscriberId = job.getFullName() + "-" + System.currentTimeMillis();
+        
         try {
             SupabaseEventTriggerConfiguration config = SupabaseEventTriggerConfiguration.get();
             SupabaseInstance instance = config.getInstanceByName(instanceName);
@@ -89,35 +97,20 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
                 return;
             }
             
-            // Construct WebSocket URL from Supabase API URL
-            String apiUrl = instance.getUrl();
-            String wsUrl = buildWebSocketUrl(apiUrl, instance.getApiKey().getPlainText());
-            
-            client = new SupabaseRealtimeClient(wsUrl, null);
-            client.connect();
-            
-            // Wait for connection
-            int attempts = 0;
-            while (!client.isOpen() && attempts < 10) {
-                Thread.sleep(500);
-                attempts++;
-            }
-            
-            if (client.isOpen()) {
-                subscribeToTables(job);
-            } else {
-                LOGGER.warning("Failed to connect to Supabase Realtime");
-            }
+            // Use connection manager for pooled connections
+            subscribeToTables(job, instance);
             
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Error starting SupabaseEventTrigger", e);
         }
     }
 
-    private void subscribeToTables(Job<?, ?> job) {
+    private void subscribeToTables(Job<?, ?> job, SupabaseInstance instance) {
         if (tables == null || tables.trim().isEmpty()) {
             return;
         }
+        
+        SupabaseConnectionManager manager = SupabaseConnectionManager.getInstance();
         
         String[] tableArray = tables.split("[,;\\s]+");
         for (String table : tableArray) {
@@ -154,12 +147,23 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
                 handlers.put("DELETE", payload -> handleEvent(job, "DELETE", finalTableName, payload));
             }
             
-            // Subscribe to all events at once
+            // Subscribe using connection manager (enables connection pooling)
             if (!events.isEmpty()) {
-                client.subscribeToTableEvents(finalSchema, finalTableName, events, handlers);
+                manager.subscribe(
+                    instanceName,
+                    instance.getUrl(),
+                    instance.getApiKey(),
+                    finalSchema,
+                    finalTableName,
+                    events,
+                    handlers,
+                    subscriberId
+                );
+                
+                subscribedTables.add(schema + "." + tableName);
+                LOGGER.info(String.format("Subscribed job %s to %s.%s for events %s", 
+                                         job.getName(), schema, tableName, events));
             }
-            
-            subscribedTables.add(schema + "." + tableName);
         }
     }
 
@@ -206,16 +210,19 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
 
     @Override
     public void stop() {
-        LOGGER.info("Stopping SupabaseEventTrigger");
-        if (client != null && client.isOpen()) {
-            for (String table : subscribedTables) {
-                String[] parts = table.split("\\.", 2);
-                if (parts.length == 2) {
-                    client.unsubscribeFromTable(parts[0], parts[1]);
-                }
+        LOGGER.info("Stopping SupabaseEventTrigger for subscriber: " + subscriberId);
+        
+        SupabaseConnectionManager manager = SupabaseConnectionManager.getInstance();
+        
+        // Unsubscribe from all tables
+        for (String table : subscribedTables) {
+            String[] parts = table.split("\\.", 2);
+            if (parts.length == 2) {
+                manager.unsubscribe(instanceName, parts[0], parts[1], subscriberId);
             }
-            client.close();
         }
+        
+        subscribedTables.clear();
         super.stop();
     }
 
@@ -238,10 +245,13 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
      * Builds a WebSocket URL from a Supabase API URL.
      * Converts http(s):// to ws(s):// and appends the Realtime WebSocket path with required query parameters.
      * 
+     * @deprecated This method is no longer used. SupabaseConnectionManager handles URL construction.
      * @param apiUrl The Supabase API URL (e.g., http://localhost:54321 or https://your-project.supabase.co)
      * @param apiKey The Supabase API key for authentication
      * @return The WebSocket URL with proper protocol, path, and query parameters
      */
+    @Deprecated
+    @SuppressWarnings("unused")
     private String buildWebSocketUrl(String apiUrl, String apiKey) {
         // Remove trailing slash if present
         if (apiUrl.endsWith("/")) {
