@@ -167,12 +167,26 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
         LOGGER.info("Received " + eventType + " event for table " + tableName);
         
         try {
-            List<ParameterValue> parameters = new ArrayList<>();
-            parameters.add(new StringParameterValue("SUPABASE_EVENT_TYPE", eventType));
-            parameters.add(new StringParameterValue("SUPABASE_TABLE_NAME", tableName));
-            parameters.add(new StringParameterValue("SUPABASE_EVENT_DATA", payload.toString()));
+            // Extract event data from payload
+            String schema = payload.has("schema") ? payload.get("schema").getAsString() : "public";
+            String eventData = payload.toString();
             
-            ParametersAction parametersAction = new ParametersAction(parameters);
+            // Extract record data
+            String recordOld = null;
+            String recordNew = null;
+            
+            if (payload.has("old_record") && !payload.get("old_record").isJsonNull()) {
+                recordOld = payload.get("old_record").toString();
+            }
+            if (payload.has("record") && !payload.get("record").isJsonNull()) {
+                recordNew = payload.get("record").toString();
+            }
+            
+            // Create environment contributor action
+            SupabaseEventEnvironmentContributor envAction = new SupabaseEventEnvironmentContributor(
+                eventType, tableName, schema, eventData, recordOld, recordNew
+            );
+            
             CauseAction causeAction = new CauseAction(new SupabaseEventCause(eventType, tableName));
             
             if (job instanceof ParameterizedJobMixIn.ParameterizedJob) {
@@ -182,7 +196,7 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
                         return job;
                     }
                 };
-                pJob.scheduleBuild2(0, parametersAction, causeAction);
+                pJob.scheduleBuild2(0, causeAction, envAction);
                 LOGGER.info("Scheduled build for job: " + job.getName());
             }
         } catch (Exception e) {
