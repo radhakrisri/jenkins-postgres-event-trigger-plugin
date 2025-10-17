@@ -1,0 +1,45 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+  <!-- Summary view that appears in the main Changes section -->
+  <j:forEach var="change" items="${it.changes}">
+    <div style="margin-bottom: 15px;">
+      <div>
+        <strong style="color: #0066cc;">${change.eventType}</strong> 
+        event on table 
+        <code>${change.tableName}</code>
+        <span style="color: #666; font-size: 0.9em;">
+          at ${it.formatTimestamp(change.timestamp)}
+        </span>
+      </div>
+      
+      <j:if test="${change.eventType == 'INSERT' and change.recordNew != null}">
+        <div style="margin-top: 5px; margin-left: 20px; font-size: 0.9em;">
+          <strong>New record:</strong>
+          <pre style="background: #f5f5f5; padding: 5px; border-radius: 3px; margin: 5px 0; overflow-x: auto; font-size: 0.85em;">${it.formatJson(change.recordNew)}</pre>
+        </div>
+      </j:if>
+      
+      <j:if test="${change.eventType == 'UPDATE'}">
+        <j:if test="${change.recordOld != null}">
+          <div style="margin-top: 5px; margin-left: 20px; font-size: 0.9em;">
+            <strong>Old record:</strong>
+            <pre style="background: #fff3cd; padding: 5px; border-radius: 3px; margin: 5px 0; overflow-x: auto; font-size: 0.85em;">${it.formatJson(change.recordOld)}</pre>
+          </div>
+        </j:if>
+        <j:if test="${change.recordNew != null}">
+          <div style="margin-top: 5px; margin-left: 20px; font-size: 0.9em;">
+            <strong>New record:</strong>
+            <pre style="background: #d4edda; padding: 5px; border-radius: 3px; margin: 5px 0; overflow-x: auto; font-size: 0.85em;">${it.formatJson(change.recordNew)}</pre>
+          </div>
+        </j:if>
+      </j:if>
+      
+      <j:if test="${change.eventType == 'DELETE' and change.recordOld != null}">
+        <div style="margin-top: 5px; margin-left: 20px; font-size: 0.9em;">
+          <strong>Deleted record:</strong>
+          <pre style="background: #f8d7da; padding: 5px; border-radius: 3px; margin: 5px 0; overflow-x: auto; font-size: 0.85em;">${it.formatJson(change.recordOld)}</pre>
+        </div>
+      </j:if>
+    </div>
+  </j:forEach>
+</j:jelly>
