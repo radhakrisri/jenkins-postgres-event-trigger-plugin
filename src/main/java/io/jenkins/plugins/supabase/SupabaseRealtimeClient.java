@@ -44,11 +44,12 @@ public class SupabaseRealtimeClient extends WebSocketClient {
     @Override
     public void onMessage(String message) {
         try {
+            LOGGER.info("Received message: " + message);
             JsonObject json = GSON.fromJson(message, JsonObject.class);
             String event = json.has("event") ? json.get("event").getAsString() : null;
             String topic = json.has("topic") ? json.get("topic").getAsString() : null;
             
-            LOGGER.fine("Received message - Event: " + event + ", Topic: " + topic);
+            LOGGER.info("Parsed message - Event: " + event + ", Topic: " + topic);
             
             if (event != null && topic != null) {
                 String key = topic + ":" + event;
@@ -93,7 +94,8 @@ public class SupabaseRealtimeClient extends WebSocketClient {
         message.addProperty("ref", ref);
         
         JsonObject payload = new JsonObject();
-        payload.addProperty("config", "{}");
+        JsonObject config = new JsonObject();
+        payload.add("config", config);
         message.add("payload", payload);
         
         send(GSON.toJson(message));
