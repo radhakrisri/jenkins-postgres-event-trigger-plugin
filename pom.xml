@@ -95,6 +95,13 @@
             <groupId>org.java-websocket</groupId>
             <artifactId>Java-WebSocket</artifactId>
             <version>1.6.0</version>
+            <exclusions>
+                <exclusion>
+                    <!-- Exclude to prevent bundling warning - SLF4J is provided by Jenkins core -->
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- JSON processing -->
@@ -102,6 +109,14 @@
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
             <version>2.10.1</version>
+        </dependency>
+
+        <!-- FindBugs annotations for @NonNull and javax.annotation.meta.When -->
+        <dependency>
+            <groupId>com.github.spotbugs</groupId>
+            <artifactId>spotbugs-annotations</artifactId>
+            <version>4.8.6</version>
+            <scope>provided</scope>
         </dependency>
 
         <!-- Testing dependencies -->
@@ -122,6 +137,10 @@
                     <release combine.self="override"></release>
                     <source>21</source>
                     <target>21</target>
+                    <showWarnings>true</showWarnings>
+                    <compilerArgs>
+                        <arg>-Xlint:unchecked</arg>
+                    </compilerArgs>
                 </configuration>
             </plugin>
             <plugin>

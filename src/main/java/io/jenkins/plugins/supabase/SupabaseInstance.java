@@ -3,6 +3,7 @@ package io.jenkins.plugins.supabase;
 import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
 import com.cloudbees.plugins.credentials.CredentialsMatchers;
 import com.cloudbees.plugins.credentials.CredentialsProvider;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import hudson.Extension;
 import hudson.model.AbstractDescribableImpl;
 import hudson.model.Descriptor;
@@ -16,6 +17,7 @@ import org.kohsuke.stapler.QueryParameter;
 
 import java.io.Serializable;
 
+@SuppressWarnings("deprecation") // Suppress deprecation warnings for Jenkins API compatibility
 public class SupabaseInstance extends AbstractDescribableImpl<SupabaseInstance> implements Serializable {
     
     private static final long serialVersionUID = 1L;
@@ -43,16 +45,20 @@ public class SupabaseInstance extends AbstractDescribableImpl<SupabaseInstance> 
         return credentialsId;
     }
 
-    @SuppressWarnings("deprecation")
     public Secret getApiKey() {
         if (credentialsId == null || credentialsId.isEmpty()) {
+            return null;
+        }
+        
+        Jenkins jenkins = Jenkins.getInstanceOrNull();
+        if (jenkins == null) {
             return null;
         }
         
         StringCredentials credentials = CredentialsMatchers.firstOrNull(
             CredentialsProvider.lookupCredentials(
                 StringCredentials.class,
-                Jenkins.get()
+                jenkins
             ),
             CredentialsMatchers.withId(credentialsId)
         );
@@ -67,19 +73,20 @@ public class SupabaseInstance extends AbstractDescribableImpl<SupabaseInstance> 
     public static class DescriptorImpl extends Descriptor<SupabaseInstance> {
         
         @Override
+        @NonNull
         public String getDisplayName() {
             return "Supabase Instance";
         }
 
-        @SuppressWarnings("deprecation")
         public ListBoxModel doFillCredentialsIdItems(@QueryParameter String credentialsId) {
-            if (!Jenkins.get().hasPermission(Jenkins.ADMINISTER)) {
+            Jenkins jenkins = Jenkins.getInstanceOrNull();
+            if (jenkins == null || !jenkins.hasPermission(Jenkins.ADMINISTER)) {
                 return new StandardListBoxModel().includeCurrentValue(credentialsId);
             }
             
             return new StandardListBoxModel()
                 .includeEmptyValue()
-                .includeAs(ACL.SYSTEM, Jenkins.get(), StringCredentials.class);
+                .includeAs(ACL.SYSTEM, jenkins, StringCredentials.class);
         }
     }
 }

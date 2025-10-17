@@ -1,9 +1,14 @@
 package io.jenkins.plugins.supabase;
 
+import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
 import hudson.Extension;
+import hudson.security.ACL;
 import hudson.util.FormValidation;
+import hudson.util.ListBoxModel;
 import jenkins.model.GlobalConfiguration;
+import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
+import org.jenkinsci.plugins.plaincredentials.StringCredentials;
 import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
@@ -36,6 +41,7 @@ public class SupabaseEventTriggerConfiguration extends GlobalConfiguration {
     }
 
     @Override
+    @SuppressWarnings("deprecation") // StaplerRequest.bindJSON is deprecated but still required for Jenkins compatibility
     public boolean configure(StaplerRequest req, JSONObject json) throws FormException {
         req.bindJSON(this, json);
         save();
@@ -80,5 +86,16 @@ public class SupabaseEventTriggerConfiguration extends GlobalConfiguration {
             names.add(instance.getName());
         }
         return names;
+    }
+
+    public ListBoxModel doFillCredentialsIdItems(@QueryParameter String credentialsId) {
+        Jenkins jenkins = Jenkins.getInstanceOrNull();
+        if (jenkins == null || !jenkins.hasPermission(Jenkins.ADMINISTER)) {
+            return new StandardListBoxModel().includeCurrentValue(credentialsId);
+        }
+        
+        return new StandardListBoxModel()
+            .includeEmptyValue()
+            .includeAs(ACL.SYSTEM, jenkins, StringCredentials.class);
     }
 }

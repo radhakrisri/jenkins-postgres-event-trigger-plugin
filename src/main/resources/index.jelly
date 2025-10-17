@@ -1,5 +1,5 @@
 
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j="jelly:core">
-  Supabase Event Trigger Plugin
+  Jenkins Supabase Plugin
 </j:jelly>

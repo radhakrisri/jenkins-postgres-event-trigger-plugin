@@ -141,12 +141,21 @@ public class SupabaseBuildRecorder extends Recorder implements SimpleBuildStep {
         return BuildStepMonitor.NONE;
     }
 
-    @Symbol("supabaseBuildRecorder")
+    /**
+     * Gets the descriptor for this post-build action.
+     * Required override to provide proper type safety for Jenkins descriptor system.
+     */
+    @Override
+    public DescriptorImpl getDescriptor() {
+        return (DescriptorImpl) super.getDescriptor();
+    }
+
     @Extension
+    @Symbol("supabaseBuildRecorder")
     public static final class DescriptorImpl extends BuildStepDescriptor<Publisher> {
 
         @Override
-        @SuppressWarnings("rawtypes")
+        @SuppressWarnings("rawtypes") // AbstractProject requires raw type for Jenkins compatibility
         public boolean isApplicable(Class<? extends AbstractProject> jobType) {
             return true;
         }
