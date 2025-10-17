@@ -7,7 +7,9 @@ import hudson.FilePath;
 import hudson.model.*;
 import jenkins.model.Jenkins;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
@@ -36,19 +38,18 @@ public class SupabaseDataClient {
     }
 
     /**
-     * Initialize the necessary tables in Supabase for the job.
+     * Initialize the necessary metadata for the job.
+     * Note: Tables must be created manually or via Supabase migrations.
+     * See documentation for table schemas.
      */
     public void initializeTables(Job<?, ?> job) throws IOException {
         String tableName = generateTableName(job);
         
-        // Create jobs metadata table if it doesn't exist
-        createJobsMetadataTable();
-        
-        // Create or update job-specific table
-        createJobBuildTable(tableName);
-        
         // Register/update job metadata
+        // The jobs table and build tables must be created manually beforehand
         registerJobMetadata(job, tableName);
+        
+        listener.getLogger().println("[Supabase] Job metadata registered for table: " + tableName);
     }
 
     /**
@@ -95,99 +96,7 @@ public class SupabaseDataClient {
     }
 
     /**
-     * Create the jobs metadata table.
-     */
-    private void createJobsMetadataTable() throws IOException {
-        String sql = """
-            CREATE TABLE IF NOT EXISTS jobs (
-                id SERIAL PRIMARY KEY,
-                job_name TEXT NOT NULL UNIQUE,
-                job_full_name TEXT NOT NULL,
-                job_display_name TEXT,
-                table_name TEXT NOT NULL,
-                job_type TEXT,
-                job_url TEXT,
-                folder_path TEXT,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                is_active BOOLEAN DEFAULT true,
-                configuration JSONB,
-                CONSTRAINT unique_job_full_name UNIQUE (job_full_name)
-            );
-            
-            CREATE INDEX IF NOT EXISTS idx_jobs_job_name ON jobs(job_name);
-            CREATE INDEX IF NOT EXISTS idx_jobs_table_name ON jobs(table_name);
-            CREATE INDEX IF NOT EXISTS idx_jobs_is_active ON jobs(is_active);
-            """;
-
-        executeSQL(sql, "Failed to create jobs metadata table");
-    }
-
-    /**
-     * Create the job-specific builds table.
-     */
-    private void createJobBuildTable(String tableName) throws IOException {
-        String sql = String.format("""
-            CREATE TABLE IF NOT EXISTS %s (
-                id SERIAL PRIMARY KEY,
-                build_number INTEGER NOT NULL,
-                build_id TEXT NOT NULL,
-                build_url TEXT,
-                result TEXT,
-                duration_ms BIGINT,
-                start_time TIMESTAMP WITH TIME ZONE,
-                end_time TIMESTAMP WITH TIME ZONE,
-                queue_time_ms BIGINT,
-                executor_info JSONB,
-                node_name TEXT,
-                workspace_path TEXT,
-                
-                -- Build causes and triggers
-                causes JSONB,
-                triggered_by TEXT,
-                
-                -- SCM information
-                scm_info JSONB,
-                
-                -- Artifacts information
-                artifacts JSONB,
-                
-                -- Test results
-                test_results JSONB,
-                
-                -- Stage information (for pipeline builds)
-                stages JSONB,
-                
-                -- Environment variables (if enabled)
-                environment_variables JSONB,
-                
-                -- Custom fields
-                custom_data JSONB,
-                
-                -- Metadata
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                
-                CONSTRAINT unique_build_id_%s UNIQUE (build_id),
-                CONSTRAINT unique_build_number_%s UNIQUE (build_number)
-            );
-            
-            CREATE INDEX IF NOT EXISTS idx_%s_build_number ON %s(build_number DESC);
-            CREATE INDEX IF NOT EXISTS idx_%s_result ON %s(result);
-            CREATE INDEX IF NOT EXISTS idx_%s_start_time ON %s(start_time DESC);
-            """, 
-            tableName, 
-            tableName.replaceAll("[^a-z0-9_]", ""), 
-            tableName.replaceAll("[^a-z0-9_]", ""),
-            tableName.replaceAll("[^a-z0-9_]", ""), tableName,
-            tableName.replaceAll("[^a-z0-9_]", ""), tableName,
-            tableName.replaceAll("[^a-z0-9_]", ""), tableName
-        );
-
-        executeSQL(sql, "Failed to create builds table: " + tableName);
-    }
-
-    /**
-     * Register or update job metadata.
+     * Register or update job metadata using REST API.
      */
     private void registerJobMetadata(Job<?, ?> job, String tableName) throws IOException {
         JsonObject metadata = new JsonObject();
@@ -196,7 +105,11 @@ public class SupabaseDataClient {
         metadata.addProperty("job_display_name", job.getDisplayName());
         metadata.addProperty("table_name", tableName);
         metadata.addProperty("job_type", job.getClass().getSimpleName());
-        metadata.addProperty("job_url", Jenkins.get().getRootUrl() + job.getUrl());
+        
+        String rootUrl = Jenkins.get().getRootUrl();
+        if (rootUrl != null) {
+            metadata.addProperty("job_url", rootUrl + job.getUrl());
+        }
         
         // Extract folder path
         String folderPath = "";
@@ -214,33 +127,10 @@ public class SupabaseDataClient {
         // Add configuration details
         JsonObject config = new JsonObject();
         config.addProperty("description", job.getDescription());
-        // Note: isDisabled() method might not be available in all Jenkins versions
-        // config.addProperty("disabled", job.isDisabled());
         metadata.add("configuration", config);
 
-        String sql = String.format("""
-            INSERT INTO jobs (job_name, job_full_name, job_display_name, table_name, 
-                            job_type, job_url, folder_path, configuration, updated_at)
-            VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s'::jsonb, NOW())
-            ON CONFLICT (job_full_name) 
-            DO UPDATE SET 
-                job_display_name = EXCLUDED.job_display_name,
-                job_url = EXCLUDED.job_url,
-                configuration = EXCLUDED.configuration,
-                updated_at = NOW(),
-                is_active = true;
-            """,
-            escapeSQL(job.getName()),
-            escapeSQL(job.getFullName()),
-            escapeSQL(job.getDisplayName()),
-            escapeSQL(tableName),
-            escapeSQL(job.getClass().getSimpleName()),
-            escapeSQL(Jenkins.get().getRootUrl() + job.getUrl()),
-            escapeSQL(folderPath),
-            escapeSQL(GSON.toJson(config))
-        );
-
-        executeSQL(sql, "Failed to register job metadata");
+        // Use upsert to insert or update
+        upsertRecord("jobs", metadata, "job_full_name");
     }
 
     /**
@@ -392,43 +282,18 @@ public class SupabaseDataClient {
     }
 
     /**
-     * Insert build record into the database.
+     * Insert build record using REST API.
      */
     private void insertBuildRecord(String tableName, JsonObject buildData) throws IOException {
-        StringBuilder sql = new StringBuilder();
-        sql.append("INSERT INTO ").append(tableName).append(" (");
-        
-        List<String> columns = new ArrayList<>();
-        List<String> values = new ArrayList<>();
-        
-        for (Map.Entry<String, com.google.gson.JsonElement> entry : buildData.entrySet()) {
-            columns.add(entry.getKey());
-            if (entry.getValue().isJsonObject() || entry.getValue().isJsonArray()) {
-                values.add("'" + escapeSQL(entry.getValue().toString()) + "'::jsonb");
-            } else if (entry.getValue().isJsonNull()) {
-                values.add("NULL");
-            } else {
-                values.add("'" + escapeSQL(entry.getValue().getAsString()) + "'");
-            }
-        }
-        
-        sql.append(String.join(", ", columns));
-        sql.append(") VALUES (");
-        sql.append(String.join(", ", values));
-        sql.append(");");
-
-        executeSQL(sql.toString(), "Failed to insert build record");
+        insertRecord(tableName, buildData);
     }
 
     /**
-     * Execute SQL against Supabase.
+     * Insert a record into a Supabase table using REST API.
      */
-    private void executeSQL(String sql, String errorMessage) throws IOException {
-        String apiUrl = instance.getUrl() + "/rest/v1/rpc/execute_sql";
+    private void insertRecord(String tableName, JsonObject data) throws IOException {
+        String apiUrl = instance.getUrl() + "/rest/v1/" + tableName;
         
-        JsonObject payload = new JsonObject();
-        payload.addProperty("sql", sql);
-
         try {
             URI uri = new URI(apiUrl);
             HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
@@ -436,17 +301,81 @@ public class SupabaseDataClient {
             connection.setRequestProperty("Content-Type", "application/json");
             connection.setRequestProperty("apikey", instance.getApiKey().getPlainText());
             connection.setRequestProperty("Authorization", "Bearer " + instance.getApiKey().getPlainText());
+            connection.setRequestProperty("Prefer", "return=representation");
             connection.setDoOutput(true);
 
             try (OutputStream os = connection.getOutputStream()) {
-                byte[] input = GSON.toJson(payload).getBytes(StandardCharsets.UTF_8);
+                byte[] input = GSON.toJson(data).getBytes(StandardCharsets.UTF_8);
                 os.write(input, 0, input.length);
             }
 
             int responseCode = connection.getResponseCode();
             if (responseCode != 200 && responseCode != 201) {
-                throw new IOException(errorMessage + ": HTTP " + responseCode);
+                // Read error response
+                String errorMsg = "HTTP " + responseCode;
+                try (BufferedReader br = new BufferedReader(
+                        new InputStreamReader(connection.getErrorStream(), StandardCharsets.UTF_8))) {
+                    StringBuilder response = new StringBuilder();
+                    String responseLine;
+                    while ((responseLine = br.readLine()) != null) {
+                        response.append(responseLine.trim());
+                    }
+                    if (response.length() > 0) {
+                        errorMsg += ": " + response.toString();
+                    }
+                }
+                throw new IOException("Failed to insert record into " + tableName + ": " + errorMsg);
             }
+            
+            LOGGER.fine("Successfully inserted record into " + tableName);
+        } catch (URISyntaxException e) {
+            throw new IOException("Invalid URL: " + apiUrl, e);
+        }
+    }
+
+    /**
+     * Upsert a record (insert or update on conflict) using REST API.
+     * PostgREST upsert uses the Prefer header with "resolution=merge-duplicates"
+     * and requires specifying the conflict columns via on_conflict query parameter.
+     */
+    private void upsertRecord(String tableName, JsonObject data, String conflictColumn) throws IOException {
+        // Add on_conflict query parameter for upsert
+        String apiUrl = instance.getUrl() + "/rest/v1/" + tableName + "?on_conflict=" + conflictColumn;
+        
+        try {
+            URI uri = new URI(apiUrl);
+            HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setRequestProperty("apikey", instance.getApiKey().getPlainText());
+            connection.setRequestProperty("Authorization", "Bearer " + instance.getApiKey().getPlainText());
+            // Use Prefer header for upsert behavior
+            connection.setRequestProperty("Prefer", "resolution=merge-duplicates");
+            connection.setDoOutput(true);
+
+            try (OutputStream os = connection.getOutputStream()) {
+                byte[] input = GSON.toJson(data).getBytes(StandardCharsets.UTF_8);
+                os.write(input, 0, input.length);
+            }
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode != 200 && responseCode != 201) {
+                String errorMsg = "HTTP " + responseCode;
+                try (BufferedReader br = new BufferedReader(
+                        new InputStreamReader(connection.getErrorStream(), StandardCharsets.UTF_8))) {
+                    StringBuilder response = new StringBuilder();
+                    String responseLine;
+                    while ((responseLine = br.readLine()) != null) {
+                        response.append(responseLine.trim());
+                    }
+                    if (response.length() > 0) {
+                        errorMsg += ": " + response.toString();
+                    }
+                }
+                throw new IOException("Failed to upsert record into " + tableName + ": " + errorMsg);
+            }
+            
+            LOGGER.fine("Successfully upserted record into " + tableName);
         } catch (URISyntaxException e) {
             throw new IOException("Invalid URL: " + apiUrl, e);
         }
@@ -459,13 +388,5 @@ public class SupabaseDataClient {
         return Instant.ofEpochMilli(millis)
                 .atOffset(ZoneOffset.UTC)
                 .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-    }
-
-    /**
-     * Escape SQL string values.
-     */
-    private String escapeSQL(String value) {
-        if (value == null) return "";
-        return value.replace("'", "''");
     }
 }
