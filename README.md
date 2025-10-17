@@ -232,18 +232,112 @@ pipeline {
 
 ### Components
 
-- **PostgresEventTrigger**: Main trigger class that subscribes to database events and schedules builds
+- **SupabaseConnectionManager**: Singleton connection manager that pools WebSocket connections per Supabase instance
+  - Shares one connection across all jobs for the same instance
+  - Automatic reconnection with exponential backoff (1s → 30s)
+  - Thread-safe event multiplexing to multiple subscribers
+  - Connection health monitoring and statistics
+- **SupabaseEventTrigger**: Main trigger class that subscribes to database events and schedules builds
 - **SupabaseRealtimeClient**: WebSocket client for connecting to Supabase Realtime
 - **SupabaseInstance**: Configuration object for Supabase instance details
 - **PostgresEventTriggerConfiguration**: Global configuration for managing Supabase instances
 
 ### Event Flow
 
-1. When a job with the trigger is started, the plugin establishes a WebSocket connection to Supabase Realtime
-2. The plugin subscribes to the specified tables and events
-3. When a database event occurs, Supabase sends a message through the WebSocket
-4. The plugin receives the event, creates a build cause, and schedules a build
-5. The event data is passed to the build as environment variables
+1. When a job with the trigger is started, the plugin uses the connection manager to subscribe to events
+2. The connection manager creates or reuses an existing WebSocket connection to Supabase Realtime
+3. Multiple jobs can share the same connection efficiently (connection pooling)
+4. When a database event occurs, Supabase sends a message through the WebSocket
+5. The connection manager routes events to all relevant job handlers (event multiplexing)
+6. Each job receives the event, creates a build cause, and schedules a build
+7. The event data is passed to the build as environment variables
+8. If the connection drops, automatic reconnection with exponential backoff ensures reliability
+
+### Production Features
+
+#### Connection Pooling
+- **One connection per Supabase instance** shared across all jobs
+- Efficient resource usage (100 jobs = 1 connection, not 100)
+- Reference counting manages connection lifecycle
+- Automatic cleanup when last subscriber disconnects
+
+#### Automatic Reconnection
+- **Exponential backoff strategy**: 1s → 2s → 4s → 8s → 16s → max 30s
+- Maximum 10 retry attempts before giving up
+- Automatic resubscription to all channels after reconnect
+- Network resilience ensures 24/7 reliability
+
+#### Thread Safety
+- `ConcurrentHashMap` for all shared data structures
+- `AtomicInteger` for counters
+- `CopyOnWriteArrayList` for subscription lists
+- No race conditions or `ConcurrentModificationException`
+
+#### Health Monitoring
+- **Connection statistics API** for monitoring:
+  - Connection state (CONNECTED, DISCONNECTED, CONNECTING, ERROR)
+  - Uptime since connection established
+  - Events received and failed
+  - Reconnection attempts
+  - Active subscriber count
+- Detailed logging at all lifecycle stages
+- Metrics integration for operational visibility
+
+#### Architecture Diagram
+
+**Before (Without Connection Manager):**
+```
+Job 1 ──► WebSocket 1 ──┐
+Job 2 ──► WebSocket 2 ──┼──► Supabase
+Job 3 ──► WebSocket 3 ──┘
+```
+*Issues: Multiple connections, no reconnection, not thread-safe*
+
+**After (With Connection Manager):**
+```
+Job 1 ──┐
+Job 2 ──┼──► Connection Manager ──► WebSocket (shared) ──► Supabase
+Job 3 ──┘     (pooling, reconnection, multiplexing)
+```
+*Benefits: 1 connection, auto-reconnect, thread-safe, monitored*
+
+## Production Readiness
+
+### ✅ Enterprise Features
+- **Connection Pooling**: Efficient resource usage with shared connections
+- **Automatic Reconnection**: Network resilience with exponential backoff
+- **Thread Safety**: Concurrent operations without race conditions
+- **Health Monitoring**: Statistics API for operational visibility
+- **Graceful Shutdown**: Proper cleanup on Jenkins shutdown
+- **Backward Compatible**: Existing configurations work without changes
+
+### Testing
+- **21 unit tests** covering all core functionality
+- **Functional testing** verified with INSERT/UPDATE/DELETE events
+- **Thread safety** tested with concurrent operations
+- **Memory leak prevention** verified
+
+### Monitoring
+Use the connection manager statistics API to monitor plugin health:
+```java
+// Access via Jenkins Script Console
+import io.jenkins.plugins.supabase.SupabaseConnectionManager;
+
+def stats = SupabaseConnectionManager.getInstance().getStats();
+stats.each { instanceName, connStats ->
+    println "Instance: ${instanceName}"
+    println "  State: ${connStats.state}"
+    println "  Uptime: ${(System.currentTimeMillis() - connStats.connectedSince) / 1000}s"
+    println "  Events: ${connStats.eventsReceived} received, ${connStats.eventsFailed} failed"
+    println "  Reconnections: ${connStats.reconnections}"
+    println "  Subscribers: ${connStats.subscriberCount}"
+}
+```
+
+**Recommended Alerts:**
+- Alert if `state != CONNECTED` for > 5 minutes
+- Alert if `reconnections > 3` in 1 hour
+- Alert if `eventsFailed > threshold`
 
 ## Troubleshooting
 
@@ -252,6 +346,8 @@ pipeline {
 - Verify that your Supabase URL is correct and includes the protocol (https:// or wss://)
 - Ensure your API key credentials are correctly configured
 - Check Jenkins logs for detailed error messages
+- **Check connection statistics** via Script Console (see Monitoring section above)
+- Connection will automatically retry with exponential backoff (check `reconnections` counter)
 
 ### No Events Received
 
@@ -259,12 +355,16 @@ pipeline {
 - Check that the table names are spelled correctly
 - Ensure the schema is specified if not using the default "public" schema
 - Verify that your API key has the necessary permissions
+- **Check connection state** - should be `CONNECTED`
+- Look for `eventsFailed` counter increases indicating processing errors
 
 ### Build Not Triggering
 
 - Confirm that at least one event type (INSERT, UPDATE, or DELETE) is selected
 - Check the Jenkins system log for trigger-related messages
 - Verify that the job is enabled and not queued
+- **Verify subscription** - check `subscriberCount` for the instance
+- Test with a simple INSERT to confirm event delivery
 
 ## Development
 
