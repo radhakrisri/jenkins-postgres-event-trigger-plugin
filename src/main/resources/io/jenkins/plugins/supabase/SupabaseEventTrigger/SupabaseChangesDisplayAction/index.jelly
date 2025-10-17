@@ -1,0 +1,56 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+  <l:layout title="Supabase Database Changes">
+    <st:include page="sidepanel.jelly" it="${it.run}" />
+    <l:main-panel>
+      <h1>Supabase Database Changes</h1>
+      
+      <j:forEach var="change" items="${it.changes}">
+        <div class="build-caption" style="margin-bottom: 20px; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+          <h2 style="margin-top: 0;">
+            <span style="font-weight: bold; color: #0066cc;">${change.eventType}</span> 
+            event on table 
+            <code>${change.tableName}</code>
+          </h2>
+          
+          <p style="color: #666; font-size: 0.9em;">
+            <strong>Time:</strong> ${it.formatTimestamp(change.timestamp)}
+          </p>
+          
+          <j:if test="${change.eventType == 'INSERT' and change.recordNew != null}">
+            <div style="margin-top: 10px;">
+              <strong>New Record:</strong>
+              <pre style="background: #f5f5f5; padding: 10px; border-radius: 3px; overflow-x: auto;">${it.formatJson(change.recordNew)}</pre>
+            </div>
+          </j:if>
+          
+          <j:if test="${change.eventType == 'UPDATE'}">
+            <j:if test="${change.recordOld != null}">
+              <div style="margin-top: 10px;">
+                <strong>Old Record:</strong>
+                <pre style="background: #fff3cd; padding: 10px; border-radius: 3px; overflow-x: auto;">${it.formatJson(change.recordOld)}</pre>
+              </div>
+            </j:if>
+            <j:if test="${change.recordNew != null}">
+              <div style="margin-top: 10px;">
+                <strong>New Record:</strong>
+                <pre style="background: #d4edda; padding: 10px; border-radius: 3px; overflow-x: auto;">${it.formatJson(change.recordNew)}</pre>
+              </div>
+            </j:if>
+          </j:if>
+          
+          <j:if test="${change.eventType == 'DELETE' and change.recordOld != null}">
+            <div style="margin-top: 10px;">
+              <strong>Deleted Record:</strong>
+              <pre style="background: #f8d7da; padding: 10px; border-radius: 3px; overflow-x: auto;">${it.formatJson(change.recordOld)}</pre>
+            </div>
+          </j:if>
+        </div>
+      </j:forEach>
+      
+      <j:if test="${empty(it.changes)}">
+        <p>No Supabase database changes in this build.</p>
+      </j:if>
+    </l:main-panel>
+  </l:layout>
+</j:jelly>

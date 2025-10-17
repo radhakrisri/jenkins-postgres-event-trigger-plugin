@@ -3,6 +3,7 @@ package io.jenkins.plugins.supabase;
 import com.google.gson.JsonObject;
 import hudson.Extension;
 import hudson.model.*;
+import hudson.scm.ChangeLogSet;
 import hudson.triggers.Trigger;
 import hudson.triggers.TriggerDescriptor;
 import hudson.util.FormValidation;
@@ -186,12 +187,20 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
                 recordNew = payload.get("record").toString();
             }
             
+            long timestamp = System.currentTimeMillis();
+            
             // Create environment contributor action
             SupabaseEventEnvironmentContributor envAction = new SupabaseEventEnvironmentContributor(
                 eventType, tableName, schema, eventData, recordOld, recordNew
             );
             
-            CauseAction causeAction = new CauseAction(new SupabaseEventCause(eventType, tableName, recordNew, recordOld));
+            // Create cause with simplified description (just table, type, and when)
+            CauseAction causeAction = new CauseAction(new SupabaseEventCause(eventType, tableName, timestamp));
+            
+            // Create action to hold change data for the Changes section
+            SupabaseEventChangeAction changeAction = new SupabaseEventChangeAction(
+                eventType, tableName, recordNew, recordOld, timestamp
+            );
             
             if (job instanceof ParameterizedJobMixIn.ParameterizedJob) {
                 ParameterizedJobMixIn<?, ?> pJob = new ParameterizedJobMixIn() {
@@ -200,7 +209,7 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
                         return job;
                     }
                 };
-                pJob.scheduleBuild2(0, causeAction, envAction);
+                pJob.scheduleBuild2(0, causeAction, envAction, changeAction);
                 LOGGER.info("Scheduled build for job: " + job.getName());
             }
         } catch (Exception e) {
@@ -226,20 +235,95 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
         super.stop();
     }
 
-    public static class SupabaseEventCause extends Cause {
+    /**
+     * Action that carries Supabase event change data to be displayed in the Changes section (invisible).
+     */
+    public static class SupabaseEventChangeAction extends InvisibleAction {
         private final String eventType;
         private final String tableName;
         private final String recordNew;
         private final String recordOld;
         private final long timestamp;
-        private final String eventId;
 
-        public SupabaseEventCause(String eventType, String tableName, String recordNew, String recordOld) {
+        public SupabaseEventChangeAction(String eventType, String tableName, String recordNew, String recordOld, long timestamp) {
             this.eventType = eventType;
             this.tableName = tableName;
             this.recordNew = recordNew;
             this.recordOld = recordOld;
-            this.timestamp = System.currentTimeMillis();
+            this.timestamp = timestamp;
+        }
+
+        public String getEventType() {
+            return eventType;
+        }
+
+        public String getTableName() {
+            return tableName;
+        }
+
+        public String getRecordNew() {
+            return recordNew;
+        }
+
+        public String getRecordOld() {
+            return recordOld;
+        }
+
+        public long getTimestamp() {
+            return timestamp;
+        }
+    }
+
+    /**
+     * Display action for Supabase database changes - appears in the Changes section of build page.
+     */
+    public static class SupabaseChangesDisplayAction implements Action {
+        private final List<SupabaseEventChangeAction> changes;
+
+        public SupabaseChangesDisplayAction(List<SupabaseEventChangeAction> changes) {
+            this.changes = changes;
+        }
+
+        @Override
+        public String getIconFileName() {
+            return "symbol-changes";
+        }
+
+        @Override
+        public String getDisplayName() {
+            return "Supabase Changes";
+        }
+
+        @Override
+        public String getUrlName() {
+            return "supabase-changes";
+        }
+
+        public List<SupabaseEventChangeAction> getChanges() {
+            return changes;
+        }
+        
+        public String formatTimestamp(long timestamp) {
+            return new java.util.Date(timestamp).toString();
+        }
+        
+        public String formatJson(String json) {
+            if (json == null) return "";
+            // Add basic pretty printing
+            return json.replace(",", ",\n  ");
+        }
+    }
+
+    public static class SupabaseEventCause extends Cause {
+        private final String eventType;
+        private final String tableName;
+        private final long timestamp;
+        private final String eventId;
+
+        public SupabaseEventCause(String eventType, String tableName, long timestamp) {
+            this.eventType = eventType;
+            this.tableName = tableName;
+            this.timestamp = timestamp;
             this.eventId = java.util.UUID.randomUUID().toString();
         }
         
@@ -263,33 +347,20 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
 
         @Override
         public String getShortDescription() {
-            StringBuilder desc = new StringBuilder();
-            desc.append("Triggered by Supabase ").append(eventType).append(" event on table ").append(tableName);
-            desc.append(" at ").append(new java.util.Date(timestamp));
-            
-            // Add record details based on event type
-            if ("INSERT".equals(eventType) && recordNew != null) {
-                desc.append("\nNew record: ").append(formatRecord(recordNew));
-            } else if ("UPDATE".equals(eventType)) {
-                if (recordOld != null) {
-                    desc.append("\nOld record: ").append(formatRecord(recordOld));
-                }
-                if (recordNew != null) {
-                    desc.append("\nNew record: ").append(formatRecord(recordNew));
-                }
-            } else if ("DELETE".equals(eventType) && recordOld != null) {
-                desc.append("\nDeleted record: ").append(formatRecord(recordOld));
-            }
-            
-            return desc.toString();
+            return String.format("Supabase %s event on table %s at %s", 
+                eventType, tableName, new java.util.Date(timestamp));
         }
         
-        private String formatRecord(String json) {
-            // Truncate if too long to keep description readable
-            if (json.length() > 200) {
-                return json.substring(0, 197) + "...";
-            }
-            return json;
+        public String getEventType() {
+            return eventType;
+        }
+        
+        public String getTableName() {
+            return tableName;
+        }
+        
+        public long getTimestamp() {
+            return timestamp;
         }
     }
     
@@ -317,6 +388,117 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
         wsUrl = wsUrl + "/realtime/v1/websocket?apikey=" + apiKey + "&vsn=1.0.0";
         
         return wsUrl;
+    }
+
+    /**
+     * Represents a Supabase database event change in the Jenkins Changes section.
+     */
+    public static class SupabaseChangeLogEntry extends ChangeLogSet.Entry {
+        private final String eventType;
+        private final String tableName;
+        private final String recordNew;
+        private final String recordOld;
+        private final long timestamp;
+
+        public SupabaseChangeLogEntry(String eventType, String tableName, String recordNew, String recordOld, long timestamp, SupabaseChangeLogSet parent) {
+            this.eventType = eventType;
+            this.tableName = tableName;
+            this.recordNew = recordNew;
+            this.recordOld = recordOld;
+            this.timestamp = timestamp;
+            setParent(parent);
+        }
+
+        @Override
+        public String getMsg() {
+            StringBuilder msg = new StringBuilder();
+            msg.append(eventType).append(" event on table ").append(tableName);
+            msg.append(" at ").append(new java.util.Date(timestamp));
+            return msg.toString();
+        }
+
+        @Override
+        public User getAuthor() {
+            return User.getUnknown();
+        }
+
+        @Override
+        public Collection<String> getAffectedPaths() {
+            return Collections.singletonList(tableName);
+        }
+
+        @Override
+        public String getMsgAnnotated() {
+            StringBuilder msg = new StringBuilder();
+            msg.append("<b>").append(eventType).append("</b> event on table <code>").append(tableName).append("</code>");
+            
+            if ("INSERT".equals(eventType) && recordNew != null) {
+                msg.append("<br/><b>New record:</b><br/><pre>").append(formatJson(recordNew)).append("</pre>");
+            } else if ("UPDATE".equals(eventType)) {
+                if (recordOld != null) {
+                    msg.append("<br/><b>Old record:</b><br/><pre>").append(formatJson(recordOld)).append("</pre>");
+                }
+                if (recordNew != null) {
+                    msg.append("<br/><b>New record:</b><br/><pre>").append(formatJson(recordNew)).append("</pre>");
+                }
+            } else if ("DELETE".equals(eventType) && recordOld != null) {
+                msg.append("<br/><b>Deleted record:</b><br/><pre>").append(formatJson(recordOld)).append("</pre>");
+            }
+            
+            return msg.toString();
+        }
+        
+        private String formatJson(String json) {
+            // Basic JSON formatting with proper escaping
+            return json.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+        }
+
+        public String getEventType() {
+            return eventType;
+        }
+
+        public String getTableName() {
+            return tableName;
+        }
+
+        public String getRecordNew() {
+            return recordNew;
+        }
+
+        public String getRecordOld() {
+            return recordOld;
+        }
+
+        public long getTimestamp() {
+            return timestamp;
+        }
+    }
+
+    /**
+     * Container for Supabase database event changes.
+     */
+    public static class SupabaseChangeLogSet extends ChangeLogSet<SupabaseChangeLogEntry> {
+        private final List<SupabaseChangeLogEntry> entries;
+
+        protected SupabaseChangeLogSet(Run<?, ?> run, List<SupabaseChangeLogEntry> entries) {
+            super(run, null);
+            this.entries = entries;
+        }
+
+        @Override
+        public boolean isEmptySet() {
+            return entries.isEmpty();
+        }
+
+        @Override
+        public Iterator<SupabaseChangeLogEntry> iterator() {
+            return entries.iterator();
+        }
+
+        @Override
+        public String getKind() {
+            return "supabase";
+        }
     }
 
     @Extension
