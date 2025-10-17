@@ -558,6 +558,36 @@ mvn clean package -Dchangelist=1.2.0-RC.1
 3. **Clean git state**: Ensure working tree is clean before releases
 4. **Test before release**: Run full test suite before tagging
 
+### Job Metadata Configuration
+
+Jobs can define custom metadata that gets recorded in the `jobs` table's `configuration` column:
+
+1. In the job configuration, under **General**, check **Supabase Build Recorder Metadata**
+2. Click **Add Metadata Field** to add key-value pairs:
+   - **Key**: Alphanumeric identifier (e.g., `team`, `environment`, `owner`)
+   - **Value**: Plain text or JSON object (e.g., `"DevOps Team"` or `{"region": "us-east-1"}`)
+3. Add multiple fields as needed - they will be combined into a single JSON object
+4. Values are automatically parsed: JSON objects/arrays are stored as nested structures, plain text as strings
+
+**Example Metadata:**
+```
+Key: team          Value: DevOps Team
+Key: environment   Value: development
+Key: config        Value: {"region": "local", "cost_center": "engineering"}
+```
+
+**Resulting JSON in database:**
+```json
+{
+  "team": "DevOps Team",
+  "environment": "development", 
+  "config": {
+    "region": "local",
+    "cost_center": "engineering"
+  }
+}
+```
+
 ## Acknowledgments
 
 - Built using the [Jenkins Plugin Parent POM](https://github.com/jenkinsci/plugin-pom)

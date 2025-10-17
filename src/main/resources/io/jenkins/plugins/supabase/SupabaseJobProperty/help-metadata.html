@@ -1,0 +1,17 @@
+<div>
+    Define custom metadata for this job as key-value pairs. This metadata will be recorded in the Supabase jobs table for easier tracking and organization.
+    <br/><br/>
+    <strong>Key:</strong> A descriptive name for the metadata field (e.g., team, environment, owner, service_type)
+    <br/>
+    <strong>Value:</strong> Can be either simple text or a JSON object/array
+    <br/><br/>
+    <strong>Examples:</strong>
+    <ul>
+        <li><strong>team</strong>: DevOps Team</li>
+        <li><strong>owner</strong>: john.doe@company.com</li>
+        <li><strong>environment</strong>: production</li>
+        <li><strong>tags</strong>: ["critical", "customer-facing"]</li>
+        <li><strong>config</strong>: {"region": "us-east-1", "tier": "premium"}</li>
+    </ul>
+    All metadata will be combined into a single JSON object and stored in the jobs table.
+</div>

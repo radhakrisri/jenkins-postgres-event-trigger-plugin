@@ -2,7 +2,9 @@ package io.jenkins.plugins.supabase;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import hudson.FilePath;
 import hudson.model.*;
 import jenkins.model.Jenkins;
@@ -127,6 +129,27 @@ public class SupabaseDataClient {
         // Add configuration details
         JsonObject config = new JsonObject();
         config.addProperty("description", job.getDescription());
+        
+        // Add Supabase Job Property metadata if configured
+        SupabaseJobProperty jobProperty = job.getProperty(SupabaseJobProperty.class);
+        if (jobProperty != null && jobProperty.hasMetadata()) {
+            for (SupabaseJobProperty.MetadataEntry entry : jobProperty.getMetadata()) {
+                String key = entry.getKey();
+                String value = entry.getValue();
+                
+                if (key != null && !key.trim().isEmpty() && value != null && !value.trim().isEmpty()) {
+                    // Try to parse the value as JSON
+                    try {
+                        JsonElement parsedValue = JsonParser.parseString(value);
+                        config.add(key, parsedValue);
+                    } catch (Exception e) {
+                        // If parsing fails, treat it as a plain string
+                        config.addProperty(key, value);
+                    }
+                }
+            }
+        }
+        
         metadata.add("configuration", config);
 
         // Use upsert to insert or update

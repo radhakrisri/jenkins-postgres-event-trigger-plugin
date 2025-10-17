@@ -308,9 +308,16 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
         }
         
         public String formatJson(String json) {
-            if (json == null) return "";
-            // Add basic pretty printing
-            return json.replace(",", ",\n  ");
+            if (json == null || json.trim().isEmpty()) return "";
+            try {
+                // Use Gson to pretty-print the JSON
+                com.google.gson.Gson gson = new com.google.gson.GsonBuilder().setPrettyPrinting().create();
+                com.google.gson.JsonElement je = com.google.gson.JsonParser.parseString(json);
+                return gson.toJson(je);
+            } catch (Exception e) {
+                // If parsing fails, return the original JSON
+                return json;
+            }
         }
     }
 
