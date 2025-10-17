@@ -191,7 +191,7 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
                 eventType, tableName, schema, eventData, recordOld, recordNew
             );
             
-            CauseAction causeAction = new CauseAction(new SupabaseEventCause(eventType, tableName));
+            CauseAction causeAction = new CauseAction(new SupabaseEventCause(eventType, tableName, recordNew, recordOld));
             
             if (job instanceof ParameterizedJobMixIn.ParameterizedJob) {
                 ParameterizedJobMixIn<?, ?> pJob = new ParameterizedJobMixIn() {
@@ -229,15 +229,44 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
     public static class SupabaseEventCause extends Cause {
         private final String eventType;
         private final String tableName;
+        private final String recordNew;
+        private final String recordOld;
 
-        public SupabaseEventCause(String eventType, String tableName) {
+        public SupabaseEventCause(String eventType, String tableName, String recordNew, String recordOld) {
             this.eventType = eventType;
             this.tableName = tableName;
+            this.recordNew = recordNew;
+            this.recordOld = recordOld;
         }
 
         @Override
         public String getShortDescription() {
-            return "Triggered by Supabase " + eventType + " event on table " + tableName;
+            StringBuilder desc = new StringBuilder();
+            desc.append("Triggered by Supabase ").append(eventType).append(" event on table ").append(tableName);
+            
+            // Add record details based on event type
+            if ("INSERT".equals(eventType) && recordNew != null) {
+                desc.append("\nNew record: ").append(formatRecord(recordNew));
+            } else if ("UPDATE".equals(eventType)) {
+                if (recordOld != null) {
+                    desc.append("\nOld record: ").append(formatRecord(recordOld));
+                }
+                if (recordNew != null) {
+                    desc.append("\nNew record: ").append(formatRecord(recordNew));
+                }
+            } else if ("DELETE".equals(eventType) && recordOld != null) {
+                desc.append("\nDeleted record: ").append(formatRecord(recordOld));
+            }
+            
+            return desc.toString();
+        }
+        
+        private String formatRecord(String json) {
+            // Truncate if too long to keep description readable
+            if (json.length() > 200) {
+                return json.substring(0, 197) + "...";
+            }
+            return json;
         }
     }
     
