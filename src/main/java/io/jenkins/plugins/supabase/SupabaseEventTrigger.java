@@ -134,20 +134,29 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
                 tableName = parts[1];
             }
             
+            // Collect events to subscribe to
+            java.util.List<String> events = new java.util.ArrayList<>();
+            java.util.Map<String, java.util.function.Consumer<JsonObject>> handlers = new java.util.HashMap<>();
+            
             final String finalSchema = schema;
             final String finalTableName = tableName;
             
             if (subscribeInsert) {
-                client.subscribeToTable(finalSchema, finalTableName, "INSERT", 
-                    payload -> handleEvent(job, "INSERT", finalTableName, payload));
+                events.add("INSERT");
+                handlers.put("INSERT", payload -> handleEvent(job, "INSERT", finalTableName, payload));
             }
             if (subscribeUpdate) {
-                client.subscribeToTable(finalSchema, finalTableName, "UPDATE", 
-                    payload -> handleEvent(job, "UPDATE", finalTableName, payload));
+                events.add("UPDATE");
+                handlers.put("UPDATE", payload -> handleEvent(job, "UPDATE", finalTableName, payload));
             }
             if (subscribeDelete) {
-                client.subscribeToTable(finalSchema, finalTableName, "DELETE", 
-                    payload -> handleEvent(job, "DELETE", finalTableName, payload));
+                events.add("DELETE");
+                handlers.put("DELETE", payload -> handleEvent(job, "DELETE", finalTableName, payload));
+            }
+            
+            // Subscribe to all events at once
+            if (!events.isEmpty()) {
+                client.subscribeToTableEvents(finalSchema, finalTableName, events, handlers);
             }
             
             subscribedTables.add(schema + "." + tableName);

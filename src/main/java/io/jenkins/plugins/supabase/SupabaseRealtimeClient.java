@@ -1,6 +1,7 @@
 package io.jenkins.plugins.supabase;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import hudson.util.Secret;
@@ -9,6 +10,8 @@ import org.java_websocket.handshake.ServerHandshake;
 
 import java.net.URI;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -52,12 +55,37 @@ public class SupabaseRealtimeClient extends WebSocketClient {
             LOGGER.info("Parsed message - Event: " + event + ", Topic: " + topic);
             
             if (event != null && topic != null) {
-                String key = topic + ":" + event;
-                Consumer<JsonObject> handler = eventHandlers.get(key);
-                if (handler != null) {
-                    JsonElement payload = json.get("payload");
-                    if (payload != null && payload.isJsonObject()) {
-                        handler.accept(payload.getAsJsonObject());
+                // Handle postgres_changes events
+                if ("postgres_changes".equals(event)) {
+                    JsonElement payloadElement = json.get("payload");
+                    if (payloadElement != null && payloadElement.isJsonObject()) {
+                        JsonObject payload = payloadElement.getAsJsonObject();
+                        JsonElement dataElement = payload.get("data");
+                        if (dataElement != null && dataElement.isJsonObject()) {
+                            JsonObject data = dataElement.getAsJsonObject();
+                            String type = data.has("type") ? data.get("type").getAsString() : null;
+                            if (type != null) {
+                                // Look up handler for this operation type
+                                String handlerKey = topic + ":" + type;
+                                Consumer<JsonObject> handler = eventHandlers.get(handlerKey);
+                                if (handler != null) {
+                                    LOGGER.info("Invoking handler for " + type + " event on " + topic);
+                                    handler.accept(data);
+                                } else {
+                                    LOGGER.fine("No handler registered for key: " + handlerKey);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Handle other event types normally
+                    String key = topic + ":" + event;
+                    Consumer<JsonObject> handler = eventHandlers.get(key);
+                    if (handler != null) {
+                        JsonElement payload = json.get("payload");
+                        if (payload != null && payload.isJsonObject()) {
+                            handler.accept(payload.getAsJsonObject());
+                        }
                     }
                 }
             }
@@ -100,6 +128,50 @@ public class SupabaseRealtimeClient extends WebSocketClient {
         
         send(GSON.toJson(message));
         LOGGER.info("Subscribed to " + topic + " for event " + event);
+    }
+
+    /**
+     * Subscribe to multiple events on a table at once.
+     * This is the recommended approach as it joins the channel once with all postgres_changes configured.
+     */
+    public void subscribeToTableEvents(String schema, String table, List<String> events, 
+                                       Map<String, Consumer<JsonObject>> eventHandlers) {
+        String topic = "realtime:" + schema + ":" + table;
+        String ref = String.valueOf(refCounter.incrementAndGet());
+        
+        // Store channel reference
+        channelRefs.put(topic, ref);
+        
+        // Register all handlers
+        for (Map.Entry<String, Consumer<JsonObject>> entry : eventHandlers.entrySet()) {
+            String handlerKey = topic + ":" + entry.getKey();
+            this.eventHandlers.put(handlerKey, entry.getValue());
+        }
+        
+        // Build postgres_changes array
+        JsonArray postgresChanges = new JsonArray();
+        for (String event : events) {
+            JsonObject change = new JsonObject();
+            change.addProperty("event", event);
+            change.addProperty("schema", schema);
+            change.addProperty("table", table);
+            postgresChanges.add(change);
+        }
+        
+        // Send join message with config
+        JsonObject message = new JsonObject();
+        message.addProperty("topic", topic);
+        message.addProperty("event", "phx_join");
+        message.addProperty("ref", ref);
+        
+        JsonObject payload = new JsonObject();
+        JsonObject config = new JsonObject();
+        config.add("postgres_changes", postgresChanges);
+        payload.add("config", config);
+        message.add("payload", payload);
+        
+        send(GSON.toJson(message));
+        LOGGER.info("Subscribed to " + topic + " for events: " + events);
     }
 
     public void unsubscribeFromTable(String schema, String table) {
