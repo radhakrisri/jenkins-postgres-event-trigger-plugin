@@ -75,6 +75,11 @@ public class SupabaseEventTrigger extends Trigger<Job<?, ?>> {
         super.start(job, newInstance);
         LOGGER.info("Starting SupabaseEventTrigger for job: " + job.getName());
         
+        // Initialize transient fields
+        if (subscribedTables == null) {
+            subscribedTables = new HashSet<>();
+        }
+        
         try {
             SupabaseEventTriggerConfiguration config = SupabaseEventTriggerConfiguration.get();
             SupabaseInstance instance = config.getInstanceByName(instanceName);
