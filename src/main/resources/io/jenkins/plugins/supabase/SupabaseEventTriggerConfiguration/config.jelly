@@ -13,6 +13,9 @@
                     <f:entry title="API Key Credentials" field="credentialsId">
                         <c:select />
                     </f:entry>
+                    <f:entry title="Database URL" field="dbUrl">
+                        <f:textbox default="postgresql://postgres:postgres@127.0.0.1:54322/postgres" />
+                    </f:entry>
                     <f:entry>
                         <div align="right">
                             <f:repeatableDeleteButton />
@@ -22,4 +25,86 @@
             </f:repeatable>
         </f:entry>
     </f:section>
+    
+    <f:section title="Build Recorder Configuration">
+        <f:entry title="Supabase Instance" field="buildRecorderInstanceName" 
+                 description="Select the Supabase instance to use for storing build records">
+            <f:select />
+        </f:entry>
+        
+        <f:entry title="Schema" field="buildRecorderSchema" 
+                 description="Database schema for build tables (default: public)">
+            <f:textbox default="public" />
+        </f:entry>
+        
+        <f:entry title="Job Metadata Table" field="buildRecorderJobTable" 
+                 description="Table name for storing job metadata (default: jenkins_jobs)">
+            <f:textbox default="jenkins_jobs" />
+        </f:entry>
+        
+        <f:validateButton title="Setup and Verify" 
+                          progress="Setting up tables..." 
+                          method="setupAndVerify" 
+                          with="buildRecorderInstanceName,buildRecorderSchema,buildRecorderJobTable" />
+        
+        <f:entry title="">
+            <div id="buildRecorderStatus" style="margin-top: 10px; padding: 10px; border-radius: 4px;">
+                <j:if test="${instance.buildRecorderConfigured}">
+                    <div style="background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;">
+                        ✓ Build Recorder is configured and ready to use.
+                    </div>
+                </j:if>
+                <j:if test="${!instance.buildRecorderConfigured}">
+                    <div style="background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba;">
+                        ⚠ Build Recorder not configured. Please click "Setup and Verify" to enable.
+                    </div>
+                </j:if>
+            </div>
+        </f:entry>
+    </f:section>
+    
+    <script type="text/javascript">
+    <![CDATA[
+        // Handle Setup and Verify button response
+        (function() {
+            // Wait for validateButton to be registered
+            if (typeof validateButton !== 'undefined' &amp;&amp; validateButton.prototype) {
+                var originalOnSuccess = validateButton.prototype.onSuccess;
+                validateButton.prototype.onSuccess = function(rsp) {
+                    try {
+                        // Safely parse response
+                        var data = typeof rsp === 'string' ? JSON.parse(rsp) : rsp;
+                        
+                        if (!data || typeof data !== 'object') {
+                            console.error('Invalid response format:', rsp);
+                            return originalOnSuccess.call(this, rsp);
+                        }
+                        
+                        var statusDiv = document.getElementById('buildRecorderStatus');
+                        if (statusDiv) {
+                            if (data.kind === 'ok') {
+                                statusDiv.innerHTML = '<div style="background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; padding: 10px; border-radius: 4px;">' + 
+                                    (data.message || 'Build Recorder configured successfully!') + '</div>';
+                            } else {
+                                statusDiv.innerHTML = '<div style="background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; padding: 10px; border-radius: 4px;">' + 
+                                    (data.message || 'Setup failed. Please check the configuration.') + '</div>';
+                            }
+                        }
+                        
+                        // Call original handler
+                        if (originalOnSuccess) {
+                            return originalOnSuccess.call(this, rsp);
+                        }
+                    } catch (e) {
+                        console.error('Error handling Setup and Verify response:', e);
+                        // Fall back to default behavior
+                        if (originalOnSuccess) {
+                            return originalOnSuccess.call(this, rsp);
+                        }
+                    }
+                };
+            }
+        })();
+    ]]>
+    </script>
 </j:jelly>

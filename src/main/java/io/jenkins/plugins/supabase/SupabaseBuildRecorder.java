@@ -42,6 +42,8 @@ public class SupabaseBuildRecorder extends Recorder implements SimpleBuildStep {
     @DataBoundConstructor
     public SupabaseBuildRecorder(String instanceName) {
         this.instanceName = instanceName;
+        // Note: Table creation happens when job is saved via JobListener
+        // See SupabaseBuildRecorderJobListener class
     }
 
     public String getInstanceName() {
@@ -113,8 +115,8 @@ public class SupabaseBuildRecorder extends Recorder implements SimpleBuildStep {
             // Create the data client
             SupabaseDataClient dataClient = new SupabaseDataClient(instance, listener);
             
-            // Initialize tables if needed
-            dataClient.initializeTables(run.getParent());
+            // Note: Table creation is handled by SupabaseBuildRecorderJobListener when job config is saved
+            // No need to initialize tables here - they should already exist
             
             // Convert EnvVars to Map for compatibility
             Map<String, String> envMap = new HashMap<>();
@@ -157,7 +159,9 @@ public class SupabaseBuildRecorder extends Recorder implements SimpleBuildStep {
         @Override
         @SuppressWarnings("rawtypes") // AbstractProject requires raw type for Jenkins compatibility
         public boolean isApplicable(Class<? extends AbstractProject> jobType) {
-            return true;
+            // Only make Build Recorder available if it has been configured
+            SupabaseEventTriggerConfiguration config = SupabaseEventTriggerConfiguration.get();
+            return config != null && config.isBuildRecorderConfigured();
         }
 
         @Override
@@ -176,6 +180,29 @@ public class SupabaseBuildRecorder extends Recorder implements SimpleBuildStep {
                 }
             }
             return items;
+        }
+
+        /**
+         * Validates the Build Recorder configuration and provides helpful error messages.
+         */
+        public FormValidation doCheckConfiguration() {
+            SupabaseEventTriggerConfiguration config = SupabaseEventTriggerConfiguration.get();
+            
+            if (config == null) {
+                return FormValidation.error("Supabase plugin configuration not found. Please configure it in Manage Jenkins > System.");
+            }
+            
+            if (!config.isBuildRecorderConfigured()) {
+                return FormValidation.warning(
+                    "Build Recorder is not configured. Please go to Manage Jenkins > System > Build Recorder Configuration and click 'Setup and Verify'."
+                );
+            }
+            
+            if (config.getSupabaseInstances() == null || config.getSupabaseInstances().isEmpty()) {
+                return FormValidation.error("No Supabase instances configured. Please configure at least one instance in Manage Jenkins > System.");
+            }
+            
+            return FormValidation.ok("Build Recorder is configured and ready.");
         }
 
         public FormValidation doCheckInstanceName(@QueryParameter String value) {

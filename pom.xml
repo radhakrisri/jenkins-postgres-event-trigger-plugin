@@ -111,6 +111,13 @@
             <version>2.10.1</version>
         </dependency>
 
+        <!-- PostgreSQL JDBC Driver for direct SQL execution -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.7.3</version>
+        </dependency>
+
         <!-- FindBugs annotations for @NonNull and javax.annotation.meta.When -->
         <dependency>
             <groupId>com.github.spotbugs</groupId>

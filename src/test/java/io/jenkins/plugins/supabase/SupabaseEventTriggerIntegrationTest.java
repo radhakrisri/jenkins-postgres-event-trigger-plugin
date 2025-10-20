@@ -33,7 +33,7 @@ public class SupabaseEventTriggerIntegrationTest {
         
         // Set up test Supabase instance
         List<SupabaseInstance> instances = new ArrayList<>();
-        instances.add(new SupabaseInstance("test-instance", "http://localhost:54321", "test-cred"));
+        instances.add(new SupabaseInstance("test-instance", "http://localhost:54321", "test-cred", "postgresql://postgres:postgres@localhost:54322/postgres"));
         config.setSupabaseInstances(instances);
     }
     

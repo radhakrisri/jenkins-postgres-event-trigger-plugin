@@ -3,10 +3,13 @@
     <f:entry title="Instance Name" field="name">
         <f:textbox />
     </f:entry>
-    <f:entry title="Supabase URL" field="url" description="Supabase project URL (e.g., https://xxxxx.supabase.co or wss://xxxxx.supabase.co/realtime/v1/websocket)">
+    <f:entry title="Supabase URL" field="url">
         <f:textbox />
     </f:entry>
-    <f:entry title="API Key Credentials" field="credentialsId" description="Select the credentials containing the Supabase API key">
+    <f:entry title="Database URL" field="dbUrl">
+        <f:textbox default="postgresql://postgres:postgres@127.0.0.1:54322/postgres"/>
+    </f:entry>
+    <f:entry title="API Key Credentials" field="credentialsId">
         <c:select />
     </f:entry>
 </j:jelly>

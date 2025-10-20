@@ -16,23 +16,27 @@ public class SupabaseInstanceTest {
         String name = "test-instance";
         String url = "https://test.supabase.co";
         String credentialsId = "test-cred-id";
+        String dbUrl = "postgresql://postgres:postgres@localhost:54322/postgres";
 
-        SupabaseInstance instance = new SupabaseInstance(name, url, credentialsId);
+        SupabaseInstance instance = new SupabaseInstance(name, url, credentialsId, dbUrl);
 
         assertEquals(name, instance.getName());
         assertEquals(url, instance.getUrl());
         assertEquals(credentialsId, instance.getCredentialsId());
+        assertEquals(dbUrl, instance.getDbUrl());
     }
 
     @Test
     public void testSupabaseInstanceWithNullCredentials() {
         String name = "test-instance";
         String url = "https://test.supabase.co";
+        String dbUrl = "postgresql://postgres:postgres@localhost:54322/postgres";
 
-        SupabaseInstance instance = new SupabaseInstance(name, url, null);
+        SupabaseInstance instance = new SupabaseInstance(name, url, null, dbUrl);
 
         assertEquals(name, instance.getName());
         assertEquals(url, instance.getUrl());
         assertNull(instance.getCredentialsId());
+        assertEquals(dbUrl, instance.getDbUrl());
     }
 }

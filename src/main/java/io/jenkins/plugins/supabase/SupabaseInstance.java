@@ -25,12 +25,14 @@ public class SupabaseInstance extends AbstractDescribableImpl<SupabaseInstance> 
     private final String name;
     private final String url;
     private final String credentialsId;
+    private final String dbUrl; // PostgreSQL connection URL
 
     @DataBoundConstructor
-    public SupabaseInstance(String name, String url, String credentialsId) {
+    public SupabaseInstance(String name, String url, String credentialsId, String dbUrl) {
         this.name = name;
         this.url = url;
         this.credentialsId = credentialsId;
+        this.dbUrl = dbUrl != null ? dbUrl : "";
     }
 
     public String getName() {
@@ -43,6 +45,10 @@ public class SupabaseInstance extends AbstractDescribableImpl<SupabaseInstance> 
 
     public String getCredentialsId() {
         return credentialsId;
+    }
+
+    public String getDbUrl() {
+        return dbUrl;
     }
 
     public Secret getApiKey() {

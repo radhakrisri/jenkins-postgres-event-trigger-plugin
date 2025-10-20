@@ -37,8 +37,8 @@ public class SupabaseEventTriggerConfigurationTest {
         SupabaseEventTriggerConfiguration config = getConfiguration();
         
         List<SupabaseInstance> instances = new ArrayList<>();
-        instances.add(new SupabaseInstance("instance1", "https://test1.supabase.co", "cred1"));
-        instances.add(new SupabaseInstance("instance2", "https://test2.supabase.co", "cred2"));
+        instances.add(new SupabaseInstance("instance1", "https://test1.supabase.co", "cred1", "postgresql://postgres:postgres@localhost:54322/postgres"));
+        instances.add(new SupabaseInstance("instance2", "https://test2.supabase.co", "cred2", "postgresql://postgres:postgres@localhost:54322/postgres"));
         
         config.setSupabaseInstances(instances);
         
@@ -54,8 +54,8 @@ public class SupabaseEventTriggerConfigurationTest {
         SupabaseEventTriggerConfiguration config = getConfiguration();
         
         List<SupabaseInstance> instances = new ArrayList<>();
-        instances.add(new SupabaseInstance("instance1", "https://test1.supabase.co", "cred1"));
-        instances.add(new SupabaseInstance("instance2", "https://test2.supabase.co", "cred2"));
+        instances.add(new SupabaseInstance("instance1", "https://test1.supabase.co", "cred1", "postgresql://postgres:postgres@localhost:54322/postgres"));
+        instances.add(new SupabaseInstance("instance2", "https://test2.supabase.co", "cred2", "postgresql://postgres:postgres@localhost:54322/postgres"));
         
         config.setSupabaseInstances(instances);
         
@@ -73,8 +73,8 @@ public class SupabaseEventTriggerConfigurationTest {
         SupabaseEventTriggerConfiguration config = getConfiguration();
         
         List<SupabaseInstance> instances = new ArrayList<>();
-        instances.add(new SupabaseInstance("instance1", "https://test1.supabase.co", "cred1"));
-        instances.add(new SupabaseInstance("instance2", "https://test2.supabase.co", "cred2"));
+        instances.add(new SupabaseInstance("instance1", "https://test1.supabase.co", "cred1", "postgresql://postgres:postgres@localhost:54322/postgres"));
+        instances.add(new SupabaseInstance("instance2", "https://test2.supabase.co", "cred2", "postgresql://postgres:postgres@localhost:54322/postgres"));
         
         config.setSupabaseInstances(instances);
         
