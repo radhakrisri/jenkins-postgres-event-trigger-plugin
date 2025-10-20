@@ -171,13 +171,19 @@ public class SupabaseBuildRecorder extends Recorder implements SimpleBuildStep {
 
         public ListBoxModel doFillInstanceNameItems() {
             ListBoxModel items = new ListBoxModel();
-            items.add("-- Select Supabase Instance --", "");
-            
             SupabaseEventTriggerConfiguration config = SupabaseEventTriggerConfiguration.get();
-            if (config != null && config.getSupabaseInstances() != null) {
+            if (config != null && config.getSupabaseInstances() != null && !config.getSupabaseInstances().isEmpty()) {
+                boolean first = true;
                 for (SupabaseInstance instance : config.getSupabaseInstances()) {
-                    items.add(instance.getName(), instance.getName());
+                    if (first) {
+                        items.add(instance.getName() + " (default)", instance.getName());
+                        first = false;
+                    } else {
+                        items.add(instance.getName(), instance.getName());
+                    }
                 }
+            } else {
+                items.add("-- No Supabase Instances Configured --", "");
             }
             return items;
         }
@@ -207,14 +213,12 @@ public class SupabaseBuildRecorder extends Recorder implements SimpleBuildStep {
 
         public FormValidation doCheckInstanceName(@QueryParameter String value) {
             if (value == null || value.trim().isEmpty()) {
-                return FormValidation.error("Please select a Supabase instance");
+                return FormValidation.error("Please select a Supabase instance. This field is required.");
             }
-            
             SupabaseEventTriggerConfiguration config = SupabaseEventTriggerConfiguration.get();
             if (config == null || config.getInstanceByName(value) == null) {
                 return FormValidation.error("Supabase instance '" + value + "' not found. Please configure it in Global Configuration.");
             }
-            
             return FormValidation.ok();
         }
 
